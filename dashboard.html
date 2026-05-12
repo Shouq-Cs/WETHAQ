@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WETHAQ Beta - Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="dashboard-page">
+
+    <header class="top-navbar">
+      <div class="nav-brand">
+        <img src="logo.png" alt="WETHAQ Logo">
+        <div>
+          <h2>WETHAQ Beta</h2>
+          <p>Student / Faculty Portal</p>
+        </div>
+      </div>
+
+      <button class="nav-logout" onclick="logout()">Log Out</button>
+    </header>
+
+    <main class="dashboard-main">
+
+      <section class="dashboard-hero">
+        <div class="hero-text">
+          <span class="hero-badge">AI-Powered Complaint Management</span>
+          <h1>Welcome to WETHAQ Beta</h1>
+          <p id="userEmailText">Student / Faculty Dashboard</p>
+          <p class="hero-description">
+            Submit complaints, track progress, and let AI help classify and route your complaint to the appropriate department.
+          </p>
+        </div>
+
+        <div class="hero-status-card">
+          <h3>Quick Overview</h3>
+          <div class="status-row">
+            <span>Complaint Access</span>
+            <strong>Active</strong>
+          </div>
+          <div class="status-row">
+            <span>AI Assistant</span>
+            <strong>Available</strong>
+          </div>
+          <div class="status-row">
+            <span>Status Tracking</span>
+            <strong>Enabled</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard-actions">
+
+        <div class="action-card primary-card" onclick="goToSubmit()">
+          <div class="action-icon">✉</div>
+          <h3>Submit Complaint</h3>
+          <p>Create a new complaint, attach supporting documents, and use AI assistance before submission.</p>
+          <button>Start Complaint</button>
+        </div>
+
+        <div class="action-card" onclick="goToHistory()">
+          <div class="action-icon">📋</div>
+          <h3>Complaint History</h3>
+          <p>View your previous complaints, current status, category, department, and staff response.</p>
+          <button>View History</button>
+        </div>
+
+        <div class="action-card muted-card">
+          <div class="action-icon">🔔</div>
+          <h3>Notifications</h3>
+          <p>Receive updates when your complaint status changes or when a department responds.</p>
+          <button disabled>Coming Soon</button>
+        </div>
+
+      </section>
+
+      <section class="dashboard-note-large">
+        <strong>Tip:</strong>
+        After submitting a complaint, you can follow its progress from Complaint History.
+        Complaint status may appear as Under Review, In Progress, or Resolved.
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
