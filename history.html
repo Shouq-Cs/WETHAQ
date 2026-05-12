@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WETHAQ Beta - Complaint History</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="history-page">
+
+    <header class="top-navbar">
+      <div class="nav-brand">
+        <img src="logo.png" alt="WETHAQ Logo">
+        <div>
+          <h2>WETHAQ Beta</h2>
+          <p>Complaint History</p>
+        </div>
+      </div>
+
+      <button class="nav-logout" onclick="goToDashboard()">Back to Dashboard</button>
+    </header>
+
+    <main class="history-main">
+
+      <section class="history-hero">
+        <div>
+          <span class="hero-badge">Track Your Complaints</span>
+          <h1>Complaint History</h1>
+          <p>
+            View all previously submitted complaints, track their current status,
+            and review department responses.
+          </p>
+        </div>
+
+        <div class="history-summary">
+          <div>
+            <span>Total Complaints</span>
+            <strong id="historyTotal">0</strong>
+          </div>
+          <div>
+            <span>In Progress</span>
+            <strong id="historyInProgress">0</strong>
+          </div>
+          <div>
+            <span>Resolved</span>
+            <strong id="historyResolved">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="history-toolbar">
+        <h2>Your Submitted Complaints</h2>
+
+        <select id="statusFilter" onchange="loadComplaintHistory()">
+          <option value="All">All Statuses</option>
+          <option value="Under Review">Under Review</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Resolved">Resolved</option>
+        </select>
+      </section>
+
+      <section id="historyList" class="history-list">
+        <!-- Complaints will appear here -->
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
