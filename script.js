@@ -33,7 +33,7 @@ function login(event) {
   localStorage.setItem("wethaqUserEmail", email);
   alert("Login successful. Welcome to WETHAQ Beta!");
 
-   window.location.href = "dashboard.html";
+  window.location.href = "dashboard.html";
 }
 
 function togglePassword() {
@@ -62,6 +62,36 @@ function logout() {
   window.location.href = "index.html";
 }
 
+function loadDashboardOverview() {
+  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
+
+  const total = complaints.length;
+
+  const inProgress = complaints.filter(function (complaint) {
+    return complaint.status === "In Progress";
+  }).length;
+
+  const resolved = complaints.filter(function (complaint) {
+    return complaint.status === "Resolved";
+  }).length;
+
+  const totalElement = document.getElementById("totalComplaints");
+  const inProgressElement = document.getElementById("inProgressComplaints");
+  const resolvedElement = document.getElementById("resolvedComplaints");
+
+  if (totalElement) {
+    totalElement.textContent = total;
+  }
+
+  if (inProgressElement) {
+    inProgressElement.textContent = inProgress;
+  }
+
+  if (resolvedElement) {
+    resolvedElement.textContent = resolved;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", function () {
   const userEmailText = document.getElementById("userEmailText");
   const savedEmail = localStorage.getItem("wethaqUserEmail");
@@ -69,4 +99,6 @@ window.addEventListener("DOMContentLoaded", function () {
   if (userEmailText && savedEmail) {
     userEmailText.textContent = savedEmail;
   }
+
+  loadDashboardOverview();
 });
