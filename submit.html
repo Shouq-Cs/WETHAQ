@@ -37,77 +37,161 @@
 
         <div class="submit-card">
           <h2>Complaint Details</h2>
-          <p class="section-subtitle">Please provide the complaint title and description.</p>
+
+          <p class="section-subtitle">
+            Please provide the complaint title, college, and description.
+          </p>
 
           <form onsubmit="submitComplaint(event)">
 
             <div class="input-group">
               <label for="complaintTitle">Complaint Title</label>
+
               <input 
                 type="text" 
                 id="complaintTitle" 
                 placeholder="Example: AC issue in classroom 205"
               />
+
               <small id="titleError" class="error-message"></small>
             </div>
 
             <div class="input-group">
-              <label for="complaintDescription">Complaint Description</label>
+
+              <label for="college">College</label>
+
+              <select id="college">
+
+                <option value="">
+                  Select your college
+                </option>
+
+                <option value="College of Computer and Information Sciences">
+                  College of Computer and Information Sciences
+                </option>
+
+                <option value="College of Nursing">
+                  College of Nursing
+                </option>
+
+                <option value="College of Medicine">
+                  College of Medicine
+                </option>
+
+                <option value="College of Pharmacy">
+                  College of Pharmacy
+                </option>
+
+                <option value="College of Science">
+                  College of Science
+                </option>
+
+                <option value="College of Law and Political Science">
+                  College of Law and Political Science
+                </option>
+
+              </select>
+
+              <small id="collegeError" class="error-message"></small>
+
+            </div>
+
+            <div class="input-group">
+              <label for="complaintDescription">
+                Complaint Description
+              </label>
+
               <textarea 
                 id="complaintDescription" 
                 placeholder="Write your complaint details here..."
               ></textarea>
+
               <small id="descriptionError" class="error-message"></small>
             </div>
 
             <div class="input-group">
-              <label for="attachment">Supporting Document / Image</label>
+              <label for="attachment">
+                Supporting Document / Image
+              </label>
+
               <input type="file" id="attachment" />
             </div>
 
             <div class="submit-actions">
-              <button type="button" class="secondary-btn" onclick="rewriteComplaint()">
+
+              <button 
+                type="button"
+                class="secondary-btn"
+                onclick="rewriteComplaint()"
+              >
                 Rewrite using AI Chatbot
               </button>
 
-              <button type="submit" class="primary-btn">
+              <button
+                type="submit"
+                class="primary-btn"
+              >
                 Submit Complaint
               </button>
+
             </div>
 
           </form>
         </div>
 
         <div class="ai-card">
+
           <h2>AI Chatbot Suggestion</h2>
+
           <p class="section-subtitle">
-            The AI assistant can rewrite your complaint in a more formal and clear way.
+            The AI assistant can rewrite your complaint
+            in a more formal and clear way.
           </p>
 
-          <div id="aiSuggestionBox" class="ai-suggestion empty-state">
+          <div id="aiSuggestionBox"
+               class="ai-suggestion empty-state">
+
             No rewritten complaint yet.
+
           </div>
 
-          <button class="secondary-btn full-btn" onclick="useRewrittenText()">
+          <button
+            class="secondary-btn full-btn"
+            onclick="useRewrittenText()"
+          >
             Use This Version
           </button>
+
         </div>
 
       </section>
 
-      <section id="resultCard" class="result-card hidden">
-  <div class="success-message">
-    <div class="success-icon">✓</div>
-    <div>
-      <h2>Your complaint has been submitted successfully</h2>
-      <p>
-        Thank you for helping improve university services. Your complaint has been received,
-        classified, and routed to the appropriate department. You can track its progress from Complaint History.
-      </p>
-    </div>
-  </div>
+      <section id="resultCard"
+               class="result-card hidden">
+
+        <div class="success-message">
+
+          <div class="success-icon">✓</div>
+
+          <div>
+
+            <h2>
+              Your complaint has been submitted successfully
+            </h2>
+
+            <p>
+              Thank you for helping improve university services.
+              Your complaint has been received,
+              classified, and routed automatically.
+              You can track its progress from Complaint History.
+            </p>
+
+          </div>
+
+        </div>
 
         <div class="result-grid">
+
           <div class="result-item">
             <span>Category</span>
             <strong id="resultCategory">-</strong>
@@ -119,64 +203,93 @@
           </div>
 
           <div class="result-item">
-            <span>Routed Department</span>
+            <span>College</span>
             <strong id="resultDepartment">-</strong>
           </div>
 
           <div class="result-item">
             <span>Status</span>
-            <strong id="resultStatus">Under Review</strong>
+            <strong id="resultStatus">
+              Under Review
+            </strong>
           </div>
+
         </div>
 
         <div class="suggestions-box">
+
           <h3>Suggested Solutions</h3>
+
           <ul id="suggestionsList"></ul>
+
         </div>
 
-        <button class="primary-btn" onclick="goToHistory()">
+        <button
+          class="primary-btn"
+          onclick="goToHistory()"
+        >
           View Complaint History
         </button>
+
       </section>
 
     </main>
   </div>
 
-  <div id="successModal" class="modal-overlay hidden">
-  <div class="success-modal">
-    <div class="modal-icon">✓</div>
+  <div id="successModal"
+       class="modal-overlay hidden">
 
-    <h2>Complaint Submitted Successfully</h2>
+    <div class="success-modal">
 
-    <p>
-      Thank you for helping improve university services.
-      Your complaint has been received and saved successfully.
-    </p>
+      <div class="modal-icon">✓</div>
 
-    <div class="modal-summary">
-      <div>
-        <span>Category</span>
-        <strong id="modalCategory">-</strong>
+      <h2>
+        Complaint Submitted Successfully
+      </h2>
+
+      <p>
+        Thank you for helping improve university services.
+        Your complaint has been received and saved successfully.
+      </p>
+
+      <div class="modal-summary">
+
+        <div>
+          <span>Category</span>
+          <strong id="modalCategory">-</strong>
+        </div>
+
+        <div>
+          <span>Status</span>
+          <strong id="modalStatus">
+            Under Review
+          </strong>
+        </div>
+
       </div>
 
-      <div>
-        <span>Status</span>
-        <strong id="modalStatus">Under Review</strong>
+      <div class="modal-actions">
+
+        <button
+          onclick="goToDashboard()"
+          class="secondary-btn"
+        >
+          Go to Dashboard
+        </button>
+
+        <button
+          onclick="goToHistory()"
+          class="primary-btn"
+        >
+          Go to Complaint History
+        </button>
+
       </div>
-    </div>
 
-    <div class="modal-actions">
-      <button onclick="goToDashboard()" class="secondary-btn">
-        Go to Dashboard
-      </button>
-
-      <button onclick="goToHistory()" class="primary-btn">
-        Go to Complaint History
-      </button>
     </div>
   </div>
-</div>
 
   <script src="script.js"></script>
+
 </body>
 </html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WETHAQ Beta - Staff Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="staff-page">
+
+    <header class="top-navbar">
+      <div class="nav-brand">
+        <img src="logo.png" alt="WETHAQ Logo">
+        <div>
+          <h2>WETHAQ Beta</h2>
+          <p>Department Staff Dashboard</p>
+        </div>
+      </div>
+
+      <button class="nav-logout" onclick="logout()">Log Out</button>
+    </header>
+
+    <main class="staff-main">
+
+      <section class="staff-hero">
+        <div>
+          <span class="hero-badge">Department Complaint Management</span>
+          <h1>Staff Dashboard</h1>
+          <p>
+            Review submitted complaints, check complaint details, update complaint status,
+            and write department responses. All updates will be saved and displayed to users
+            in their Complaint History.
+          </p>
+        </div>
+
+        <div class="staff-overview-card">
+          <h3>Quick Overview</h3>
+
+          <div class="status-row">
+            <span>Total Complaints</span>
+            <strong id="staffTotalComplaints">0</strong>
+          </div>
+
+          <div class="status-row">
+            <span>Under Review</span>
+            <strong id="staffUnderReview">0</strong>
+          </div>
+
+          <div class="status-row">
+            <span>In Progress</span>
+            <strong id="staffInProgress">0</strong>
+          </div>
+
+          <div class="status-row">
+            <span>Resolved</span>
+            <strong id="staffResolved">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="staff-toolbar">
+        <h2>Assigned Complaints</h2>
+        <p>
+          Below are all complaints saved in the system. You can update the status and add a department response.
+        </p>
+      </section>
+
+      <section id="staffComplaintsList" class="staff-list">
+        <!-- Staff complaints will appear here -->
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

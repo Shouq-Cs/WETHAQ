@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>WETHAQ Beta - Admin Dashboard</title>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+
+  <div class="admin-page">
+
+    <header class="top-navbar">
+
+      <div class="nav-brand">
+        <img src="logo.png" alt="WETHAQ Logo">
+
+        <div>
+          <h2>WETHAQ Beta</h2>
+          <p>University Administrator Dashboard</p>
+        </div>
+      </div>
+
+      <button class="nav-logout" onclick="logout()">
+        Log Out
+      </button>
+
+    </header>
+
+    <main class="admin-main">
+
+      <section class="admin-hero">
+
+        <span class="hero-badge">
+          Complaint Analytics & Monitoring
+        </span>
+
+        <h1>Admin Dashboard</h1>
+
+        <p>
+          Monitor complaint statistics, review complaint distribution by
+          category and college, and analyze submitted complaints
+          across the university system.
+        </p>
+
+      </section>
+
+      <section class="admin-overview-grid">
+
+        <div class="admin-overview-card">
+          <span>Total Complaints</span>
+          <strong id="adminTotalComplaints">0</strong>
+        </div>
+
+        <div class="admin-overview-card">
+          <span>Under Review</span>
+          <strong id="adminUnderReview">0</strong>
+        </div>
+
+        <div class="admin-overview-card">
+          <span>In Progress</span>
+          <strong id="adminInProgress">0</strong>
+        </div>
+
+        <div class="admin-overview-card">
+          <span>Resolved</span>
+          <strong id="adminResolved">0</strong>
+        </div>
+
+        <div class="admin-overview-card">
+          <span>Urgent / Very Urgent</span>
+          <strong id="adminUrgent">0</strong>
+        </div>
+
+      </section>
+
+      <section class="admin-stats-grid">
+
+        <div class="admin-card">
+
+          <h2>Complaints by Category</h2>
+
+          <div id="adminCategoryStats"></div>
+
+        </div>
+
+        <div class="admin-card">
+
+          <h2>Complaints by College</h2>
+
+          <div id="adminDepartmentStats"></div>
+
+        </div>
+
+      </section>
+
+      <section class="admin-toolbar">
+
+        <div>
+          <h2>All Submitted Complaints</h2>
+        </div>
+
+        <div class="admin-filters">
+
+          <select
+            id="adminCategoryFilter"
+            onchange="loadAdminDashboard()"
+          >
+            <option value="All">
+              All Categories
+            </option>
+          </select>
+
+          <select
+            id="adminDepartmentFilter"
+            onchange="loadAdminDashboard()"
+          >
+            <option value="All">
+              All Colleges
+            </option>
+          </select>
+
+        </div>
+
+      </section>
+
+      <section class="admin-table-wrapper">
+
+        <table class="admin-table">
+
+          <thead>
+
+            <tr>
+              <th>Title</th>
+              <th>Category</th>
+              <th>College</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+
+          </thead>
+
+          <tbody id="adminComplaintsTable">
+            <!-- Complaints appear here -->
+          </tbody>
+
+        </table>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="script.js"></script>
+
+</body>
+</html>
