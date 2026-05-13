@@ -45,7 +45,7 @@ function login(event) {
   localStorage.setItem("wethaqUserName", matchedUser.name);
   localStorage.setItem("wethaqUserRole", matchedUser.role);
 
-  if (matchedUser.role === "student" || matchedUser.role === "faculty") {
+  if (matchedUser.role === "student") {
     window.location.href = "dashboard.html";
   } else if (matchedUser.role === "staff") {
     window.location.href = "staff.html";
@@ -75,18 +75,8 @@ function goToHistory() {
   window.location.href = "history.html";
 }
 
-function goToDashboard() {
-  window.location.href = "dashboard.html";
-}
-
-function goToLogin() {
-  window.location.href = "index.html";
-}
-
 function logout() {
   localStorage.removeItem("wethaqUserEmail");
-  localStorage.removeItem("wethaqUserName");
-  localStorage.removeItem("wethaqUserRole");
   window.location.href = "index.html";
 }
 
@@ -107,12 +97,35 @@ function loadDashboardOverview() {
   const inProgressElement = document.getElementById("inProgressComplaints");
   const resolvedElement = document.getElementById("resolvedComplaints");
 
-  if (totalElement) totalElement.textContent = total;
-  if (inProgressElement) inProgressElement.textContent = inProgress;
-  if (resolvedElement) resolvedElement.textContent = resolved;
+  if (totalElement) {
+    totalElement.textContent = total;
+  }
+
+  if (inProgressElement) {
+    inProgressElement.textContent = inProgress;
+  }
+
+  if (resolvedElement) {
+    resolvedElement.textContent = resolved;
+  }
 }
 
-function rewriteComplaint() {
+window.addEventListener("DOMContentLoaded", function () {
+  const userEmailText = document.getElementById("userEmailText");
+  const savedEmail = localStorage.getItem("wethaqUserEmail");
+
+  if (userEmailText && savedEmail) {
+    userEmailText.textContent = savedEmail;
+  }
+
+  loadDashboardOverview();
+});
+
+function goToDashboard() {
+  window.location.href = "dashboard.html";
+}
+
+async function rewriteComplaint() {
   const description = document.getElementById("complaintDescription");
   const aiSuggestionBox = document.getElementById("aiSuggestionBox");
 
@@ -125,13 +138,22 @@ function rewriteComplaint() {
     return;
   }
 
-  const rewrittenText =
-    "I would like to formally report the following issue: " +
-    text +
-    " I kindly request that the responsible department reviews this complaint and takes the necessary action as soon as possible.";
-
   aiSuggestionBox.classList.remove("empty-state");
-  aiSuggestionBox.textContent = rewrittenText;
+  aiSuggestionBox.textContent = "Generating AI rewrite... Please wait.";
+
+  const prompt = `
+  Rewrite the following complaint in a formal, clear, and professional tone.
+  Return ONLY a JSON object with a single key "rewrittenText".
+  Complaint: "${text}"
+  `;
+
+  const aiData = await fetchGroqAI(prompt);
+
+  if (aiData && aiData.rewrittenText) {
+    aiSuggestionBox.textContent = aiData.rewrittenText;
+  } else {
+    aiSuggestionBox.textContent = "Error generating text. Please try again.";
+  }
 }
 
 function useRewrittenText() {
@@ -151,126 +173,50 @@ function useRewrittenText() {
   description.value = aiSuggestionBox.textContent.trim();
 }
 
-function classifyComplaint(description) {
-  const text = description.toLowerCase();
+async function classifyComplaintWithAI(description) {
+  const prompt = `
+  Analyze the following university complaint.
+  Return ONLY a JSON object with these exact keys:
+  1. "category" (String: e.g., Facilities, Academic, Financial, Technical, Administrative)
+  2. "department" (String: e.g., Facilities Department, Academic Affairs Department, IT Department)
+  3. "urgency" (String: Non-Urgent, Urgent, Very Urgent)
+  4. "manualReviewRequired" (Boolean: true or false)
+  5. "suggestions" (Array of Strings: 2 to 3 suggestions to resolve the issue)
 
-  let category = "Default Category";
-  let department = "Manual Review";
-  let manualReviewRequired = true;
+  Complaint: "${description}"
+  `;
 
-  if (
-    text.includes("ac") ||
-    text.includes("air conditioner") ||
-    text.includes("elevator") ||
-    text.includes("building") ||
-    text.includes("classroom") ||
-    text.includes("lab")
-  ) {
-    category = "Facilities";
-    department = "Facilities Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("grade") ||
-    text.includes("course") ||
-    text.includes("professor") ||
-    text.includes("exam") ||
-    text.includes("assignment")
-  ) {
-    category = "Academic";
-    department = "Academic Affairs Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("payment") ||
-    text.includes("tuition") ||
-    text.includes("refund") ||
-    text.includes("fee")
-  ) {
-    category = "Financial";
-    department = "Finance Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("login") ||
-    text.includes("wifi") ||
-    text.includes("wi-fi") ||
-    text.includes("system") ||
-    text.includes("portal")
-  ) {
-    category = "Technical";
-    department = "IT Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("registration") ||
-    text.includes("schedule") ||
-    text.includes("certificate")
-  ) {
-    category = "Administrative";
-    department = "Administration Department";
-    manualReviewRequired = false;
+  const aiData = await fetchGroqAI(prompt);
+
+  if (!aiData) {
+    return {
+      category: "Unclassified",
+      department: "General Admin",
+      urgency: "Normal",
+      manualReviewRequired: true,
+      suggestions: ["Manual review needed due to AI error."]
+    };
   }
 
-  let urgency = "Non-Urgent";
-
-  if (
-    text.includes("dangerous") ||
-    text.includes("fire") ||
-    text.includes("emergency") ||
-    text.includes("electrical") ||
-    text.includes("safety")
-  ) {
-    urgency = "Very Urgent";
-  } else if (
-    text.includes("urgent") ||
-    text.includes("unsafe") ||
-    text.includes("immediately")
-  ) {
-    urgency = "Urgent";
-  }
-
-  let suggestions = [];
-
-  if (manualReviewRequired) {
-    suggestions = ["No suggestions available"];
-  } else {
-    suggestions = [
-      "Attach a supporting document or image if available.",
-      "Provide the exact location, course, or related details.",
-      "Track the complaint status from Complaint History."
-    ];
-  }
-
-  return {
-    category,
-    department,
-    urgency,
-    manualReviewRequired,
-    suggestions
-  };
+  return aiData;
 }
 
-function submitComplaint(event) {
+async function submitComplaint(event) {
   event.preventDefault();
 
   const title = document.getElementById("complaintTitle").value.trim();
-  const college = document.getElementById("college").value;
   const description = document.getElementById("complaintDescription").value.trim();
 
   const titleError = document.getElementById("titleError");
-  const collegeError = document.getElementById("collegeError");
   const descriptionError = document.getElementById("descriptionError");
 
   titleError.textContent = "";
-  collegeError.textContent = "";
   descriptionError.textContent = "";
 
   let isValid = true;
 
   if (title === "") {
     titleError.textContent = "Complaint title is required.";
-    isValid = false;
-  }
-
-  if (college === "") {
-    collegeError.textContent = "College is required.";
     isValid = false;
   }
 
@@ -281,19 +227,14 @@ function submitComplaint(event) {
 
   if (!isValid) return;
 
-  const aiResult = classifyComplaint(description);
-
+const aiResult = await classifyComplaintWithAI(description);
   const complaint = {
     id: Date.now(),
     title: title,
     description: description,
-
-    college: college,
-
     category: aiResult.category,
     urgency: aiResult.urgency,
     department: aiResult.department,
-
     status: "Under Review",
     response: "",
     manualReviewRequired: aiResult.manualReviewRequired,
@@ -305,45 +246,30 @@ function submitComplaint(event) {
   complaints.push(complaint);
   localStorage.setItem("complaints", JSON.stringify(complaints));
 
-  const resultCategory = document.getElementById("resultCategory");
-  const resultUrgency = document.getElementById("resultUrgency");
-  const resultDepartment = document.getElementById("resultDepartment");
-  const resultStatus = document.getElementById("resultStatus");
+  document.getElementById("resultCategory").textContent = complaint.category;
+  document.getElementById("resultUrgency").textContent = complaint.urgency;
+  document.getElementById("resultDepartment").textContent = complaint.department;
+  document.getElementById("resultStatus").textContent = complaint.status;
+
   const suggestionsList = document.getElementById("suggestionsList");
-  const modalCategory = document.getElementById("modalCategory");
-  const modalStatus = document.getElementById("modalStatus");
-  const successModal = document.getElementById("successModal");
-  const resultCard = document.getElementById("resultCard");
+  suggestionsList.innerHTML = "";
 
-  if (resultCategory) resultCategory.textContent = complaint.category;
-  if (resultUrgency) resultUrgency.textContent = complaint.urgency;
-  if (resultDepartment) resultDepartment.textContent = complaint.college;
-  if (resultStatus) resultStatus.textContent = complaint.status;
+  complaint.suggestions.forEach(function (suggestion) {
+    const li = document.createElement("li");
+    li.textContent = suggestion;
+    suggestionsList.appendChild(li);
+  });
 
-  if (suggestionsList) {
-    suggestionsList.innerHTML = "";
+document.getElementById("modalCategory").textContent = complaint.category;
+document.getElementById("modalStatus").textContent = complaint.status;
 
-    complaint.suggestions.forEach(function (suggestion) {
-      const li = document.createElement("li");
-      li.textContent = suggestion;
-      suggestionsList.appendChild(li);
-    });
-  }
+document.getElementById("successModal").classList.remove("hidden");
 
-  if (modalCategory) modalCategory.textContent = complaint.category;
-  if (modalStatus) modalStatus.textContent = complaint.status;
-  if (successModal) successModal.classList.remove("hidden");
-
-  if (resultCard) {
-    resultCard.classList.remove("hidden");
-    resultCard.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-  }
-
+resultCard.scrollIntoView({
+  behavior: "smooth",
+  block: "start"
+});
   document.getElementById("complaintTitle").value = "";
-  document.getElementById("college").value = "";
   document.getElementById("complaintDescription").value = "";
 }
 
@@ -368,12 +294,11 @@ function loadComplaintHistory() {
   const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
   const selectedStatus = statusFilter ? statusFilter.value : "All";
 
-  const filteredComplaints =
-    selectedStatus === "All"
-      ? complaints
-      : complaints.filter(function (complaint) {
-          return complaint.status === selectedStatus;
-        });
+  const filteredComplaints = selectedStatus === "All"
+    ? complaints
+    : complaints.filter(function (complaint) {
+        return complaint.status === selectedStatus;
+      });
 
   updateHistorySummary(complaints);
 
@@ -389,11 +314,10 @@ function loadComplaintHistory() {
 
   historyList.innerHTML = "";
 
-  filteredComplaints.slice().reverse().forEach(function (complaint) {
-    const responseText =
-      complaint.response && complaint.response.trim() !== ""
-        ? complaint.response
-        : "No department response yet.";
+  filteredComplaints.reverse().forEach(function (complaint) {
+    const responseText = complaint.response && complaint.response.trim() !== ""
+      ? complaint.response
+      : "No department response yet.";
 
     const card = document.createElement("div");
     card.className = "complaint-card";
@@ -422,8 +346,8 @@ function loadComplaintHistory() {
         </div>
 
         <div class="meta-item">
-          <span>College</span>
-          <strong>${complaint.college || "Not selected"}</strong>
+          <span>Department</span>
+          <strong>${complaint.department}</strong>
         </div>
       </div>
 
@@ -447,11 +371,9 @@ function updateHistorySummary(complaints) {
   const resolvedElement = document.getElementById("historyResolved");
 
   const total = complaints.length;
-
   const inProgress = complaints.filter(function (complaint) {
     return complaint.status === "In Progress";
   }).length;
-
   const resolved = complaints.filter(function (complaint) {
     return complaint.status === "Resolved";
   }).length;
@@ -460,6 +382,29 @@ function updateHistorySummary(complaints) {
   if (inProgressElement) inProgressElement.textContent = inProgress;
   if (resolvedElement) resolvedElement.textContent = resolved;
 }
+
+window.addEventListener("DOMContentLoaded", function () {
+  const userEmailText = document.getElementById("userEmailText");
+  const welcomeName = document.getElementById("welcomeName");
+  const navUserName = document.getElementById("navUserName");
+
+  const savedEmail = localStorage.getItem("wethaqUserEmail");
+  const savedName = localStorage.getItem("wethaqUserName");
+
+  if (userEmailText && savedEmail) {
+    userEmailText.textContent = savedEmail;
+  }
+
+  if (welcomeName && savedName) {
+    welcomeName.textContent = "Welcome back, " + savedName;
+  }
+
+  if (navUserName && savedName) {
+    navUserName.textContent = savedName;
+  }
+
+  loadDashboardOverview();
+});
 
 function createAccount(event) {
   event.preventDefault();
@@ -499,11 +444,6 @@ function createAccount(event) {
 
   if (role === "") {
     roleError.textContent = "Please select your role.";
-    isValid = false;
-  }
-
-  if (role === "staff" || role === "admin") {
-    roleError.textContent = "Staff and Admin accounts are already created by the system.";
     isValid = false;
   }
 
@@ -547,460 +487,62 @@ function createAccount(event) {
   users.push(newUser);
   localStorage.setItem("wethaqUsers", JSON.stringify(users));
 
-  const accountModal = document.getElementById("accountModal");
-  if (accountModal) accountModal.classList.remove("hidden");
+  document.getElementById("accountModal").classList.remove("hidden");
 }
 
-/* ===== Department Staff Dashboard ===== */
+function goToLogin() {
+  window.location.href = "index.html";
+  
+}
+async function fetchGroqAI(prompt) {
+  const apiKey = "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";
+  const url = "https://api.groq.com/openai/v1/chat/completions";
 
-function loadStaffComplaints() {
-  const staffList = document.getElementById("staffComplaintsList");
-
-  if (!staffList) return;
-
-  const allComplaints = JSON.parse(localStorage.getItem("complaints")) || [];
-  const staffEmail = localStorage.getItem("wethaqUserEmail");
-  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
-
-  const currentStaff = users.find(function (user) {
-    return user.email === staffEmail;
-  });
-
-  const staffCollege = currentStaff ? currentStaff.college : "";
-
-  const complaints = allComplaints.filter(function (complaint) {
-    return complaint.college === staffCollege;
-  });
-
-  updateStaffOverview(complaints);
-
-  if (complaints.length === 0) {
-    staffList.innerHTML = `
-      <div class="empty-history">
-        <h3>No complaints assigned yet</h3>
-        <p>Complaints submitted for your college will appear here.</p>
-      </div>
-    `;
-    return;
-  }
-
-  staffList.innerHTML = "";
-
-  complaints.slice().reverse().forEach(function (complaint) {
-    const originalIndex = allComplaints.findIndex(function (item) {
-      return item.id === complaint.id;
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are an AI assistant. Always output strictly valid JSON without any markdown formatting or extra text." 
+          },
+          { 
+            role: "user", 
+            content: prompt 
+          }
+        ],
+        temperature: 0.3
+      })
     });
 
-    const responseText = complaint.response || "";
-
-    const card = document.createElement("div");
-    card.className = "staff-complaint-card";
-
-    card.innerHTML = `
-      <div class="staff-card-header">
-        <div>
-          <h3>${complaint.title}</h3>
-          <p class="complaint-date">Submitted on ${complaint.date}</p>
-        </div>
-
-        <span class="status-badge ${getStatusClass(complaint.status)}">
-          ${complaint.status}
-        </span>
-      </div>
-
-      <div class="complaint-meta">
-        <div class="meta-item">
-          <span>Category</span>
-          <strong>${complaint.category}</strong>
-        </div>
-
-        <div class="meta-item">
-          <span>Urgency</span>
-          <strong>${complaint.urgency}</strong>
-        </div>
-
-        <div class="meta-item">
-          <span>College</span>
-          <strong>${complaint.college || "Not selected"}</strong>
-        </div>
-      </div>
-
-      <p class="complaint-description">
-        ${complaint.description}
-      </p>
-
-      <div class="staff-update-box">
-        <div class="input-group">
-          <label>Status</label>
-          <select id="status-${complaint.id}">
-            <option value="Under Review" ${complaint.status === "Under Review" ? "selected" : ""}>Under Review</option>
-            <option value="In Progress" ${complaint.status === "In Progress" ? "selected" : ""}>In Progress</option>
-            <option value="Resolved" ${complaint.status === "Resolved" ? "selected" : ""}>Resolved</option>
-          </select>
-        </div>
-
-        <div class="input-group">
-          <label>Department Response</label>
-          <textarea id="response-${complaint.id}" placeholder="Write department response here...">${responseText}</textarea>
-        </div>
-
-        <button class="primary-btn" onclick="saveStaffUpdate(${originalIndex}, ${complaint.id})">
-          Save Update
-        </button>
-      </div>
-    `;
-
-    staffList.appendChild(card);
-  });
-}
-
-function updateStaffOverview(complaints) {
-  const totalElement = document.getElementById("staffTotalComplaints");
-  const underReviewElement = document.getElementById("staffUnderReview");
-  const inProgressElement = document.getElementById("staffInProgress");
-  const resolvedElement = document.getElementById("staffResolved");
-
-  const total = complaints.length;
-
-  const underReview = complaints.filter(function (complaint) {
-    return complaint.status === "Under Review";
-  }).length;
-
-  const inProgress = complaints.filter(function (complaint) {
-    return complaint.status === "In Progress";
-  }).length;
-
-  const resolved = complaints.filter(function (complaint) {
-    return complaint.status === "Resolved";
-  }).length;
-
-  if (totalElement) totalElement.textContent = total;
-  if (underReviewElement) underReviewElement.textContent = underReview;
-  if (inProgressElement) inProgressElement.textContent = inProgress;
-  if (resolvedElement) resolvedElement.textContent = resolved;
-}
-
-function saveStaffUpdate(index, complaintId) {
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
-
-  const statusInput = document.getElementById("status-" + complaintId);
-  const responseInput = document.getElementById("response-" + complaintId);
-
-  if (!statusInput || !responseInput) return;
-
-  complaints[index].status = statusInput.value;
-  complaints[index].response = responseInput.value.trim();
-
-  localStorage.setItem("complaints", JSON.stringify(complaints));
-
-  alert("Complaint update saved successfully.");
-
-  loadStaffComplaints();
-}
-
-/* ===== Admin Dashboard ===== */
-
-function loadAdminDashboard() {
-  const adminTableBody = document.getElementById("adminComplaintsTable");
-  const categoryFilter = document.getElementById("adminCategoryFilter");
-  const departmentFilter = document.getElementById("adminDepartmentFilter");
-
-  if (!adminTableBody) return;
-
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
-
-  updateAdminOverview(complaints);
-  updateAdminCategoryStats(complaints);
-  updateAdminDepartmentStats(complaints);
-  fillAdminFilters(complaints);
-
-  const selectedCategory = categoryFilter ? categoryFilter.value : "All";
-  const selectedCollege = departmentFilter ? departmentFilter.value : "All";
-
-  const filteredComplaints = complaints.filter(function (complaint) {
-    const categoryMatch =
-      selectedCategory === "All" || complaint.category === selectedCategory;
-
-    const collegeMatch =
-      selectedCollege === "All" || complaint.college === selectedCollege;
-
-    return categoryMatch && collegeMatch;
-  });
-
-  if (filteredComplaints.length === 0) {
-    adminTableBody.innerHTML = `
-      <tr>
-        <td colspan="6">No complaints found.</td>
-      </tr>
-    `;
-    return;
-  }
-
-  adminTableBody.innerHTML = "";
-
-  filteredComplaints.slice().reverse().forEach(function (complaint) {
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-      <td>${complaint.title}</td>
-      <td>${complaint.category}</td>
-      <td>${complaint.college || "Not selected"}</td>
-      <td>${complaint.urgency}</td>
-      <td>
-        <span class="status-badge ${getStatusClass(complaint.status)}">
-          ${complaint.status}
-        </span>
-      </td>
-      <td>${complaint.date}</td>
-    `;
-
-    adminTableBody.appendChild(row);
-  });
-}
-
-function updateAdminOverview(complaints) {
-  const totalElement = document.getElementById("adminTotalComplaints");
-  const underReviewElement = document.getElementById("adminUnderReview");
-  const inProgressElement = document.getElementById("adminInProgress");
-  const resolvedElement = document.getElementById("adminResolved");
-  const urgentElement = document.getElementById("adminUrgent");
-
-  const total = complaints.length;
-
-  const underReview = complaints.filter(function (complaint) {
-    return complaint.status === "Under Review";
-  }).length;
-
-  const inProgress = complaints.filter(function (complaint) {
-    return complaint.status === "In Progress";
-  }).length;
-
-  const resolved = complaints.filter(function (complaint) {
-    return complaint.status === "Resolved";
-  }).length;
-
-  const urgent = complaints.filter(function (complaint) {
-    return complaint.urgency === "Urgent" || complaint.urgency === "Very Urgent";
-  }).length;
-
-  if (totalElement) totalElement.textContent = total;
-  if (underReviewElement) underReviewElement.textContent = underReview;
-  if (inProgressElement) inProgressElement.textContent = inProgress;
-  if (resolvedElement) resolvedElement.textContent = resolved;
-  if (urgentElement) urgentElement.textContent = urgent;
-}
-
-function countByField(complaints, fieldName) {
-  const counts = {};
-
-  complaints.forEach(function (complaint) {
-    const value = complaint[fieldName] || "Unknown";
-    counts[value] = (counts[value] || 0) + 1;
-  });
-
-  return counts;
-}
-
-function updateAdminCategoryStats(complaints) {
-  const categoryList = document.getElementById("adminCategoryStats");
-
-  if (!categoryList) return;
-
-  const categories = [
-    "Academic",
-    "Facilities",
-    "Financial",
-    "Technical",
-    "Administrative",
-    "Default Category"
-  ];
-
-  const counts = countByField(complaints, "category");
-
-  categoryList.innerHTML = "";
-
-  categories.forEach(function (category) {
-    const item = document.createElement("div");
-    item.className = "admin-stat-row";
-
-    item.innerHTML = `
-      <span>${category}</span>
-      <strong>${counts[category] || 0}</strong>
-    `;
-
-    categoryList.appendChild(item);
-  });
-}
-
-function updateAdminDepartmentStats(complaints) {
-  const departmentList = document.getElementById("adminDepartmentStats");
-
-  if (!departmentList) return;
-
-  const counts = countByField(complaints, "college");
-  const colleges = Object.keys(counts);
-
-  departmentList.innerHTML = "";
-
-  if (colleges.length === 0) {
-    departmentList.innerHTML = `
-      <div class="admin-stat-row">
-        <span>No colleges yet</span>
-        <strong>0</strong>
-      </div>
-    `;
-    return;
-  }
-
-  colleges.forEach(function (college) {
-    const item = document.createElement("div");
-
-    item.className = "admin-stat-row";
-
-    item.innerHTML = `
-      <span>${college}</span>
-      <strong>${counts[college]}</strong>
-    `;
-
-    departmentList.appendChild(item);
-  });
-}
-
-function fillAdminFilters(complaints) {
-  const categoryFilter = document.getElementById("adminCategoryFilter");
-  const departmentFilter = document.getElementById("adminDepartmentFilter");
-
-  if (!categoryFilter || !departmentFilter) return;
-
-  const currentCategory = categoryFilter.value || "All";
-  const currentCollege = departmentFilter.value || "All";
-
-  const categories = [
-    ...new Set(
-      complaints.map(function (complaint) {
-        return complaint.category;
-      })
-    )
-  ];
-
-  const colleges = [
-    ...new Set(
-      complaints.map(function (complaint) {
-        return complaint.college;
-      })
-    )
-  ].filter(Boolean);
-
-  categoryFilter.innerHTML = `<option value="All">All Categories</option>`;
-  departmentFilter.innerHTML = `<option value="All">All Colleges</option>`;
-
-  categories.forEach(function (category) {
-    categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
-  });
-
-  colleges.forEach(function (college) {
-    departmentFilter.innerHTML += `<option value="${college}">${college}</option>`;
-  });
-
-  categoryFilter.value = currentCategory;
-  departmentFilter.value = currentCollege;
-}
-
-/* ===== Default System Accounts ===== */
-
-function initializeDefaultAccounts() {
-  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
-
-  const defaultAccounts = [
-    {
-      id: 1,
-      name: "Admin",
-      email: "admin@ksu.edu.sa",
-      password: "123456",
-      role: "admin"
-    },
-
-    {
-      id: 2,
-      name: "Bariah",
-      email: "bariah@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Computer and Information Sciences"
-    },
-
-    {
-      id: 3,
-      name: "Daniyah",
-      email: "daniyah@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Engineering"
-    },
-
-    {
-      id: 4,
-      name: "Layan",
-      email: "layan@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Science"
-    },
-
-    {
-      id: 5,
-      name: "Afnan",
-      email: "afnan@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Nursing"
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Groq API Rejected the request:", data);
+      return null;
     }
-  ];
 
-  defaultAccounts.forEach(function (account) {
-    const existingUser = users.find(function (user) {
-      return user.email === account.email;
-    });
-
-    if (existingUser) {
-      existingUser.name = account.name;
-      existingUser.password = account.password;
-      existingUser.role = account.role;
-      existingUser.college = account.college;
+    const content = data.choices[0].message.content;
+    
+    const startIndex = content.indexOf('{');
+    const endIndex = content.lastIndexOf('}') + 1;
+    
+    if (startIndex !== -1 && endIndex !== -1) {
+      const jsonString = content.substring(startIndex, endIndex);
+      return JSON.parse(jsonString);
     } else {
-      users.push(account);
+      console.error("AI did not return a valid JSON structure:", content);
+      return null;
     }
-  });
 
-  localStorage.setItem("wethaqUsers", JSON.stringify(users));
+  } catch (error) {
+    console.error("Network or Parsing Error:", error);
+    return null;
+  }
 }
-
-/* ===== Page Loader ===== */
-
-window.addEventListener("DOMContentLoaded", function () {
-  initializeDefaultAccounts();
-
-  const userEmailText = document.getElementById("userEmailText");
-  const welcomeName = document.getElementById("welcomeName");
-  const navUserName = document.getElementById("navUserName");
-
-  const savedEmail = localStorage.getItem("wethaqUserEmail");
-  const savedName = localStorage.getItem("wethaqUserName");
-
-  if (userEmailText && savedEmail) {
-    userEmailText.textContent = savedEmail;
-  }
-
-  if (welcomeName && savedName) {
-    welcomeName.textContent = "Welcome back, " + savedName;
-  }
-
-  if (navUserName && savedName) {
-    navUserName.textContent = savedName;
-  }
-
-  loadDashboardOverview();
-  loadComplaintHistory();
-  loadStaffComplaints();
-  loadAdminDashboard();
-});
