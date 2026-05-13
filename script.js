@@ -112,7 +112,7 @@ function loadDashboardOverview() {
   if (resolvedElement) resolvedElement.textContent = resolved;
 }
 
-function rewriteComplaint() {
+async function rewriteComplaint() {
   const description = document.getElementById("complaintDescription");
   const aiSuggestionBox = document.getElementById("aiSuggestionBox");
 
@@ -125,13 +125,22 @@ function rewriteComplaint() {
     return;
   }
 
-  const rewrittenText =
-    "I would like to formally report the following issue: " +
-    text +
-    " I kindly request that the responsible department reviews this complaint and takes the necessary action as soon as possible.";
-
   aiSuggestionBox.classList.remove("empty-state");
-  aiSuggestionBox.textContent = rewrittenText;
+  aiSuggestionBox.textContent = "Generating AI rewrite... Please wait.";
+
+  const prompt = `
+  Rewrite the following complaint in a formal, clear, and professional tone.
+  Return ONLY a JSON object with a single key "rewrittenText".
+  Complaint: "${text}"
+  `;
+
+  const aiData = await fetchGroqAI(prompt);
+
+  if (aiData && aiData.rewrittenText) {
+    aiSuggestionBox.textContent = aiData.rewrittenText;
+  } else {
+    aiSuggestionBox.textContent = "Error generating text. Please try again.";
+  }
 }
 
 function useRewrittenText() {
@@ -151,103 +160,35 @@ function useRewrittenText() {
   description.value = aiSuggestionBox.textContent.trim();
 }
 
-function classifyComplaint(description) {
-  const text = description.toLowerCase();
+async function classifyComplaintWithAI(description) {
+  const prompt = `
+  Analyze the following university complaint.
+  Return ONLY a JSON object with these exact keys:
+  1. "category" (String: e.g., Facilities, Academic, Financial, Technical, Administrative)
+  2. "department" (String: e.g., Facilities Department, Academic Affairs Department, IT Department)
+  3. "urgency" (String: Non-Urgent, Urgent, Very Urgent)
+  4. "manualReviewRequired" (Boolean: true or false)
+  5. "suggestions" (Array of Strings: 2 to 3 suggestions to resolve the issue)
 
-  let category = "Default Category";
-  let department = "Manual Review";
-  let manualReviewRequired = true;
+  Complaint: "${description}"
+  `;
 
-  if (
-    text.includes("ac") ||
-    text.includes("air conditioner") ||
-    text.includes("elevator") ||
-    text.includes("building") ||
-    text.includes("classroom") ||
-    text.includes("lab")
-  ) {
-    category = "Facilities";
-    department = "Facilities Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("grade") ||
-    text.includes("course") ||
-    text.includes("professor") ||
-    text.includes("exam") ||
-    text.includes("assignment")
-  ) {
-    category = "Academic";
-    department = "Academic Affairs Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("payment") ||
-    text.includes("tuition") ||
-    text.includes("refund") ||
-    text.includes("fee")
-  ) {
-    category = "Financial";
-    department = "Finance Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("login") ||
-    text.includes("wifi") ||
-    text.includes("wi-fi") ||
-    text.includes("system") ||
-    text.includes("portal")
-  ) {
-    category = "Technical";
-    department = "IT Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("registration") ||
-    text.includes("schedule") ||
-    text.includes("certificate")
-  ) {
-    category = "Administrative";
-    department = "Administration Department";
-    manualReviewRequired = false;
+  const aiData = await fetchGroqAI(prompt);
+
+  if (!aiData) {
+    return {
+      category: "Unclassified",
+      department: "General Admin",
+      urgency: "Normal",
+      manualReviewRequired: true,
+      suggestions: ["Manual review needed due to AI error."]
+    };
   }
 
-  let urgency = "Non-Urgent";
-
-  if (
-    text.includes("dangerous") ||
-    text.includes("fire") ||
-    text.includes("emergency") ||
-    text.includes("electrical") ||
-    text.includes("safety")
-  ) {
-    urgency = "Very Urgent";
-  } else if (
-    text.includes("urgent") ||
-    text.includes("unsafe") ||
-    text.includes("immediately")
-  ) {
-    urgency = "Urgent";
-  }
-
-  let suggestions = [];
-
-  if (manualReviewRequired) {
-    suggestions = ["No suggestions available"];
-  } else {
-    suggestions = [
-      "Attach a supporting document or image if available.",
-      "Provide the exact location, course, or related details.",
-      "Track the complaint status from Complaint History."
-    ];
-  }
-
-  return {
-    category,
-    department,
-    urgency,
-    manualReviewRequired,
-    suggestions
-  };
+  return aiData;
 }
 
-function submitComplaint(event) {
+async function submitComplaint(event) {
   event.preventDefault();
 
   const title = document.getElementById("complaintTitle").value.trim();
@@ -273,8 +214,7 @@ function submitComplaint(event) {
 
   if (!isValid) return;
 
-  const aiResult = classifyComplaint(description);
-
+const aiResult = await classifyComplaintWithAI(description);
   const complaint = {
     id: Date.now(),
     title: title,
@@ -902,3 +842,55 @@ window.addEventListener("DOMContentLoaded", function () {
   loadStaffComplaints();
   loadAdminDashboard();
 });
+async function fetchGroqAI(prompt) {
+  const apiKey = "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";
+  const url = "https://api.groq.com/openai/v1/chat/completions";
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama-3.1-8b-instant",
+        messages: [
+          { 
+            role: "system", 
+            content: "You are an AI assistant. Always output strictly valid JSON without any markdown formatting or extra text." 
+          },
+          { 
+            role: "user", 
+            content: prompt 
+          }
+        ],
+        temperature: 0.3
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Groq API Rejected the request:", data);
+      return null;
+    }
+
+    const content = data.choices[0].message.content;
+    
+    const startIndex = content.indexOf('{');
+    const endIndex = content.lastIndexOf('}') + 1;
+    
+    if (startIndex !== -1 && endIndex !== -1) {
+      const jsonString = content.substring(startIndex, endIndex);
+      return JSON.parse(jsonString);
+    } else {
+      console.error("AI did not return a valid JSON structure:", content);
+      return null;
+    }
+
+  } catch (error) {
+    console.error("Network or Parsing Error:", error);
+    return null;
+  }
+}
