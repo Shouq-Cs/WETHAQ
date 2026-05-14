@@ -1,62 +1,60 @@
-function login(event) {
-  event.preventDefault();
+const API_BASE = "http://localhost:5000";
 
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value.trim();
+function getCurrentUser() {
+  return JSON.parse(sessionStorage.getItem("wethaqCurrentUser") || "null");
+}
 
-  const emailError = document.getElementById("emailError");
-  const passwordError = document.getElementById("passwordError");
+function setCurrentUser(user) {
+  sessionStorage.setItem("wethaqCurrentUser", JSON.stringify(user));
+}
 
-  emailError.textContent = "";
-  passwordError.textContent = "";
+function requireLogin() {
+  const user = getCurrentUser();
+  const publicPages = ["index.html", "register.html", ""];
+  const currentPage = window.location.pathname.split("/").pop();
 
-  let isValid = true;
-
-  if (email === "") {
-    emailError.textContent = "University email is required.";
-    isValid = false;
-  } else if (!email.includes("@")) {
-    emailError.textContent = "Please enter a valid university email.";
-    isValid = false;
+  if (!user && !publicPages.includes(currentPage)) {
+    window.location.href = "index.html";
+    return null;
   }
 
-  if (password === "") {
-    passwordError.textContent = "Password is required.";
-    isValid = false;
-  } else if (password.length < 6) {
-    passwordError.textContent = "Password must be at least 6 characters.";
-    isValid = false;
-  }
+  return user;
+}
 
-  if (!isValid) return;
-
-  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
-
-  const matchedUser = users.find(function (user) {
-    return user.email === email && user.password === password;
+async function apiRequest(url, options = {}) {
+  const response = await fetch(API_BASE + url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    },
+    ...options
   });
 
-  if (!matchedUser) {
-    emailError.textContent = "Invalid email or password.";
-    return;
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed.");
   }
 
-  localStorage.setItem("wethaqUserEmail", matchedUser.email);
-  localStorage.setItem("wethaqUserName", matchedUser.name);
-  localStorage.setItem("wethaqUserRole", matchedUser.role);
+  return data;
+}
 
-  if (matchedUser.role === "student" || matchedUser.role === "faculty") {
-    window.location.href = "dashboard.html";
-  } else if (matchedUser.role === "staff") {
-    window.location.href = "staff.html";
-  } else if (matchedUser.role === "admin") {
-    window.location.href = "admin.html";
-  }
+function showText(elementId, message) {
+  const element = document.getElementById(elementId);
+  if (element) element.textContent = message;
+}
+
+function getStatusClass(status) {
+  if (status === "In Progress") return "status-in-progress";
+  if (status === "Resolved") return "status-resolved";
+  return "status-under-review";
 }
 
 function togglePassword() {
   const passwordInput = document.getElementById("password");
   const showButton = document.querySelector(".show-btn");
+
+  if (!passwordInput || !showButton) return;
 
   if (passwordInput.type === "password") {
     passwordInput.type = "text";
@@ -84,35 +82,125 @@ function goToLogin() {
 }
 
 function logout() {
-  localStorage.removeItem("wethaqUserEmail");
-  localStorage.removeItem("wethaqUserName");
-  localStorage.removeItem("wethaqUserRole");
+  sessionStorage.removeItem("wethaqCurrentUser");
   window.location.href = "index.html";
 }
 
-function loadDashboardOverview() {
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
+async function login(event) {
+  event.preventDefault();
 
-  const total = complaints.length;
+  const email = document.getElementById("email").value.trim().toLowerCase();
+  const password = document.getElementById("password").value.trim();
 
-  const inProgress = complaints.filter(function (complaint) {
-    return complaint.status === "In Progress";
-  }).length;
+  showText("emailError", "");
+  showText("passwordError", "");
 
-  const resolved = complaints.filter(function (complaint) {
-    return complaint.status === "Resolved";
-  }).length;
+  let isValid = true;
 
-  const totalElement = document.getElementById("totalComplaints");
-  const inProgressElement = document.getElementById("inProgressComplaints");
-  const resolvedElement = document.getElementById("resolvedComplaints");
+  if (email === "") {
+    showText("emailError", "University email is required.");
+    isValid = false;
+  } else if (!email.includes("@")) {
+    showText("emailError", "Please enter a valid university email.");
+    isValid = false;
+  }
 
-  if (totalElement) totalElement.textContent = total;
-  if (inProgressElement) inProgressElement.textContent = inProgress;
-  if (resolvedElement) resolvedElement.textContent = resolved;
+  if (password === "") {
+    showText("passwordError", "Password is required.");
+    isValid = false;
+  } else if (password.length < 6) {
+    showText("passwordError", "Password must be at least 6 characters.");
+    isValid = false;
+  }
+
+  if (!isValid) return;
+
+  try {
+    const data = await apiRequest("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password })
+    });
+
+    setCurrentUser(data.user);
+
+    if (data.user.role === "student" || data.user.role === "faculty") {
+      window.location.href = "dashboard.html";
+    } else if (data.user.role === "staff") {
+      window.location.href = "staff.html";
+    } else if (data.user.role === "admin") {
+      window.location.href = "admin.html";
+    }
+  } catch (error) {
+    showText("emailError", error.message);
+  }
 }
 
-function rewriteComplaint() {
+async function createAccount(event) {
+  event.preventDefault();
+
+  const name = document.getElementById("fullName").value.trim();
+  const email = document.getElementById("registerEmail").value.trim().toLowerCase();
+  const role = document.getElementById("registerRole").value;
+  const password = document.getElementById("registerPassword").value.trim();
+  const confirmPassword = document.getElementById("confirmPassword").value.trim();
+
+  showText("nameError", "");
+  showText("registerEmailError", "");
+  showText("roleError", "");
+  showText("registerPasswordError", "");
+  showText("confirmPasswordError", "");
+
+  let isValid = true;
+
+  if (name === "") {
+    showText("nameError", "Full name is required.");
+    isValid = false;
+  }
+
+  if (email === "") {
+    showText("registerEmailError", "University email is required.");
+    isValid = false;
+  } else if (!email.includes("@")) {
+    showText("registerEmailError", "Please enter a valid university email.");
+    isValid = false;
+  }
+
+  if (role === "") {
+    showText("roleError", "Please select your role.");
+    isValid = false;
+  }
+
+  if (password === "") {
+    showText("registerPasswordError", "Password is required.");
+    isValid = false;
+  } else if (password.length < 6) {
+    showText("registerPasswordError", "Password must be at least 6 characters.");
+    isValid = false;
+  }
+
+  if (confirmPassword === "") {
+    showText("confirmPasswordError", "Please confirm your password.");
+    isValid = false;
+  } else if (password !== confirmPassword) {
+    showText("confirmPasswordError", "Passwords do not match.");
+    isValid = false;
+  }
+
+  if (!isValid) return;
+
+  try {
+    await apiRequest("/api/register", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password, role })
+    });
+
+    document.getElementById("accountModal").classList.remove("hidden");
+  } catch (error) {
+    showText("registerEmailError", error.message);
+  }
+}
+
+async function rewriteComplaint() {
   const description = document.getElementById("complaintDescription");
   const aiSuggestionBox = document.getElementById("aiSuggestionBox");
 
@@ -125,13 +213,22 @@ function rewriteComplaint() {
     return;
   }
 
-  const rewrittenText =
-    "I would like to formally report the following issue: " +
-    text +
-    " I kindly request that the responsible department reviews this complaint and takes the necessary action as soon as possible.";
-
   aiSuggestionBox.classList.remove("empty-state");
-  aiSuggestionBox.textContent = rewrittenText;
+  aiSuggestionBox.textContent = "Rewriting...";
+
+  try {
+    const data = await apiRequest("/chat", {
+      method: "POST",
+      body: JSON.stringify({ description: text })
+    });
+
+    aiSuggestionBox.textContent = data.rewrittenText;
+  } catch (error) {
+    aiSuggestionBox.textContent =
+      "I would like to formally report the following issue: " +
+      text +
+      " I kindly request that the responsible department reviews this complaint and takes the necessary action as soon as possible.";
+  }
 }
 
 function useRewrittenText() {
@@ -142,7 +239,8 @@ function useRewrittenText() {
 
   if (
     aiSuggestionBox.textContent.trim() === "" ||
-    aiSuggestionBox.textContent.trim() === "No rewritten complaint yet."
+    aiSuggestionBox.textContent.trim() === "No rewritten complaint yet." ||
+    aiSuggestionBox.textContent.trim() === "Rewriting..."
   ) {
     alert("Please generate a rewritten complaint first.");
     return;
@@ -151,294 +249,195 @@ function useRewrittenText() {
   description.value = aiSuggestionBox.textContent.trim();
 }
 
-function classifyComplaint(description) {
-  const text = description.toLowerCase();
-
-  let category = "Default Category";
-  let department = "Manual Review";
-  let manualReviewRequired = true;
-
-  if (
-    text.includes("ac") ||
-    text.includes("air conditioner") ||
-    text.includes("elevator") ||
-    text.includes("building") ||
-    text.includes("classroom") ||
-    text.includes("lab")
-  ) {
-    category = "Facilities";
-    department = "Facilities Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("grade") ||
-    text.includes("course") ||
-    text.includes("professor") ||
-    text.includes("exam") ||
-    text.includes("assignment")
-  ) {
-    category = "Academic";
-    department = "Academic Affairs Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("payment") ||
-    text.includes("tuition") ||
-    text.includes("refund") ||
-    text.includes("fee")
-  ) {
-    category = "Financial";
-    department = "Finance Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("login") ||
-    text.includes("wifi") ||
-    text.includes("wi-fi") ||
-    text.includes("system") ||
-    text.includes("portal")
-  ) {
-    category = "Technical";
-    department = "IT Department";
-    manualReviewRequired = false;
-  } else if (
-    text.includes("registration") ||
-    text.includes("schedule") ||
-    text.includes("certificate")
-  ) {
-    category = "Administrative";
-    department = "Administration Department";
-    manualReviewRequired = false;
-  }
-
-  let urgency = "Non-Urgent";
-
-  if (
-    text.includes("dangerous") ||
-    text.includes("fire") ||
-    text.includes("emergency") ||
-    text.includes("electrical") ||
-    text.includes("safety")
-  ) {
-    urgency = "Very Urgent";
-  } else if (
-    text.includes("urgent") ||
-    text.includes("unsafe") ||
-    text.includes("immediately")
-  ) {
-    urgency = "Urgent";
-  }
-
-  let suggestions = [];
-
-  if (manualReviewRequired) {
-    suggestions = ["No suggestions available"];
-  } else {
-    suggestions = [
-      "Attach a supporting document or image if available.",
-      "Provide the exact location, course, or related details.",
-      "Track the complaint status from Complaint History."
-    ];
-  }
-
-  return {
-    category,
-    department,
-    urgency,
-    manualReviewRequired,
-    suggestions
-  };
-}
-
-function submitComplaint(event) {
+async function submitComplaint(event) {
   event.preventDefault();
 
+  const user = requireLogin();
+  if (!user) return;
+
   const title = document.getElementById("complaintTitle").value.trim();
-  const college = document.getElementById("college").value;
   const description = document.getElementById("complaintDescription").value.trim();
 
-  const titleError = document.getElementById("titleError");
-  const collegeError = document.getElementById("collegeError");
-  const descriptionError = document.getElementById("descriptionError");
-
-  titleError.textContent = "";
-  collegeError.textContent = "";
-  descriptionError.textContent = "";
+  showText("titleError", "");
+  showText("descriptionError", "");
 
   let isValid = true;
 
   if (title === "") {
-    titleError.textContent = "Complaint title is required.";
-    isValid = false;
-  }
-
-  if (college === "") {
-    collegeError.textContent = "College is required.";
+    showText("titleError", "Complaint title is required.");
     isValid = false;
   }
 
   if (description === "") {
-    descriptionError.textContent = "Complaint description is required.";
+    showText("descriptionError", "Complaint description is required.");
     isValid = false;
   }
 
   if (!isValid) return;
 
-  const aiResult = classifyComplaint(description);
-
-  const complaint = {
-    id: Date.now(),
-    title: title,
-    description: description,
-
-    college: college,
-
-    category: aiResult.category,
-    urgency: aiResult.urgency,
-    department: aiResult.department,
-
-    status: "Under Review",
-    response: "",
-    manualReviewRequired: aiResult.manualReviewRequired,
-    date: new Date().toLocaleDateString(),
-    suggestions: aiResult.suggestions
-  };
-
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
-  complaints.push(complaint);
-  localStorage.setItem("complaints", JSON.stringify(complaints));
-
-  const resultCategory = document.getElementById("resultCategory");
-  const resultUrgency = document.getElementById("resultUrgency");
-  const resultDepartment = document.getElementById("resultDepartment");
-  const resultStatus = document.getElementById("resultStatus");
-  const suggestionsList = document.getElementById("suggestionsList");
-  const modalCategory = document.getElementById("modalCategory");
-  const modalStatus = document.getElementById("modalStatus");
-  const successModal = document.getElementById("successModal");
-  const resultCard = document.getElementById("resultCard");
-
-  if (resultCategory) resultCategory.textContent = complaint.category;
-  if (resultUrgency) resultUrgency.textContent = complaint.urgency;
-  if (resultDepartment) resultDepartment.textContent = complaint.college;
-  if (resultStatus) resultStatus.textContent = complaint.status;
-
-  if (suggestionsList) {
-    suggestionsList.innerHTML = "";
-
-    complaint.suggestions.forEach(function (suggestion) {
-      const li = document.createElement("li");
-      li.textContent = suggestion;
-      suggestionsList.appendChild(li);
+  try {
+    const data = await apiRequest("/api/complaints", {
+      method: "POST",
+      body: JSON.stringify({
+        title,
+        description,
+        userEmail: user.email,
+        userName: user.name
+      })
     });
+
+    const complaint = data.complaint;
+
+    showText("resultCategory", complaint.category);
+    showText("resultUrgency", complaint.urgency);
+    showText("resultDepartment", complaint.department);
+    showText("resultStatus", complaint.status);
+
+    const suggestionsList = document.getElementById("suggestionsList");
+    if (suggestionsList) {
+      suggestionsList.innerHTML = "";
+      complaint.suggestions.forEach(function (suggestion) {
+        const li = document.createElement("li");
+        li.textContent = suggestion;
+        suggestionsList.appendChild(li);
+      });
+    }
+
+    showText("modalCategory", complaint.category);
+    showText("modalStatus", complaint.status);
+
+    const resultCard = document.getElementById("resultCard");
+    if (resultCard) {
+      resultCard.classList.remove("hidden");
+      resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    const successModal = document.getElementById("successModal");
+    if (successModal) successModal.classList.remove("hidden");
+
+    document.getElementById("complaintTitle").value = "";
+    document.getElementById("complaintDescription").value = "";
+
+    loadDashboardOverview();
+  } catch (error) {
+    showText("descriptionError", error.message);
   }
-
-  if (modalCategory) modalCategory.textContent = complaint.category;
-  if (modalStatus) modalStatus.textContent = complaint.status;
-  if (successModal) successModal.classList.remove("hidden");
-
-  if (resultCard) {
-    resultCard.classList.remove("hidden");
-    resultCard.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-  }
-
-  document.getElementById("complaintTitle").value = "";
-  document.getElementById("college").value = "";
-  document.getElementById("complaintDescription").value = "";
 }
 
-function getStatusClass(status) {
-  if (status === "In Progress") {
-    return "status-in-progress";
-  }
+async function getVisibleComplaints() {
+  const user = getCurrentUser();
 
-  if (status === "Resolved") {
-    return "status-resolved";
-  }
+  if (!user) return [];
 
-  return "status-under-review";
+  const params = new URLSearchParams({
+    role: user.role,
+    userEmail: user.email || "",
+    department: user.department || ""
+  });
+
+  return apiRequest("/api/complaints?" + params.toString());
 }
 
-function loadComplaintHistory() {
+async function loadDashboardOverview() {
+  const totalElement = document.getElementById("totalComplaints");
+  const inProgressElement = document.getElementById("inProgressComplaints");
+  const resolvedElement = document.getElementById("resolvedComplaints");
+
+  if (!totalElement && !inProgressElement && !resolvedElement) return;
+
+  try {
+    const complaints = await getVisibleComplaints();
+
+    const total = complaints.length;
+    const inProgress = complaints.filter((complaint) => complaint.status === "In Progress").length;
+    const resolved = complaints.filter((complaint) => complaint.status === "Resolved").length;
+
+    if (totalElement) totalElement.textContent = total;
+    if (inProgressElement) inProgressElement.textContent = inProgress;
+    if (resolvedElement) resolvedElement.textContent = resolved;
+  } catch (error) {
+    console.error(error.message);
+  }
+}
+
+async function loadComplaintHistory() {
   const historyList = document.getElementById("historyList");
   const statusFilter = document.getElementById("statusFilter");
 
   if (!historyList) return;
 
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
-  const selectedStatus = statusFilter ? statusFilter.value : "All";
+  try {
+    const complaints = await getVisibleComplaints();
+    const selectedStatus = statusFilter ? statusFilter.value : "All";
 
-  const filteredComplaints =
-    selectedStatus === "All"
+    const filteredComplaints = selectedStatus === "All"
       ? complaints
-      : complaints.filter(function (complaint) {
-          return complaint.status === selectedStatus;
-        });
+      : complaints.filter((complaint) => complaint.status === selectedStatus);
 
-  updateHistorySummary(complaints);
+    updateHistorySummary(complaints);
 
-  if (filteredComplaints.length === 0) {
-    historyList.innerHTML = `
-      <div class="empty-history">
-        <h3>No complaints found</h3>
-        <p>Your submitted complaints will appear here after submission.</p>
-      </div>
-    `;
-    return;
-  }
+    if (filteredComplaints.length === 0) {
+      historyList.innerHTML = `
+        <div class="empty-history">
+          <h3>No complaints found</h3>
+          <p>Your submitted complaints will appear here after submission.</p>
+        </div>
+      `;
+      return;
+    }
 
-  historyList.innerHTML = "";
+    historyList.innerHTML = "";
 
-  filteredComplaints.slice().reverse().forEach(function (complaint) {
-    const responseText =
-      complaint.response && complaint.response.trim() !== ""
+    filteredComplaints.slice().reverse().forEach(function (complaint) {
+      const responseText = complaint.response && complaint.response.trim() !== ""
         ? complaint.response
         : "No department response yet.";
 
-    const card = document.createElement("div");
-    card.className = "complaint-card";
+      const card = document.createElement("div");
+      card.className = "complaint-card";
 
-    card.innerHTML = `
-      <div class="complaint-card-header">
-        <div>
-          <h3>${complaint.title}</h3>
-          <p class="complaint-date">Submitted on ${complaint.date}</p>
+      card.innerHTML = `
+        <div class="complaint-card-header">
+          <div>
+            <h3>${complaint.title}</h3>
+            <p class="complaint-date">Submitted on ${complaint.date}</p>
+          </div>
+
+          <span class="status-badge ${getStatusClass(complaint.status)}">
+            ${complaint.status}
+          </span>
         </div>
 
-        <span class="status-badge ${getStatusClass(complaint.status)}">
-          ${complaint.status}
-        </span>
-      </div>
+        <div class="complaint-meta">
+          <div class="meta-item">
+            <span>Category</span>
+            <strong>${complaint.category}</strong>
+          </div>
 
-      <div class="complaint-meta">
-        <div class="meta-item">
-          <span>Category</span>
-          <strong>${complaint.category}</strong>
+          <div class="meta-item">
+            <span>Urgency</span>
+            <strong>${complaint.urgency}</strong>
+          </div>
+
+          <div class="meta-item">
+            <span>Department</span>
+            <strong>${complaint.department}</strong>
+          </div>
         </div>
 
-        <div class="meta-item">
-          <span>Urgency</span>
-          <strong>${complaint.urgency}</strong>
+        <p class="complaint-description">${complaint.description}</p>
+
+        <div class="complaint-response">
+          <strong>Department Response:</strong>
+          <p>${responseText}</p>
         </div>
+      `;
 
-        <div class="meta-item">
-          <span>College</span>
-          <strong>${complaint.college || "Not selected"}</strong>
-        </div>
-      </div>
-
-      <p class="complaint-description">
-        ${complaint.description}
-      </p>
-
-      <div class="complaint-response">
-        <strong>Department Response:</strong>
-        <p>${responseText}</p>
-      </div>
-    `;
-
-    historyList.appendChild(card);
-  });
+      historyList.appendChild(card);
+    });
+  } catch (error) {
+    historyList.innerHTML = `<div class="empty-history"><h3>${error.message}</h3></div>`;
+  }
 }
 
 function updateHistorySummary(complaints) {
@@ -447,560 +446,216 @@ function updateHistorySummary(complaints) {
   const resolvedElement = document.getElementById("historyResolved");
 
   const total = complaints.length;
-
-  const inProgress = complaints.filter(function (complaint) {
-    return complaint.status === "In Progress";
-  }).length;
-
-  const resolved = complaints.filter(function (complaint) {
-    return complaint.status === "Resolved";
-  }).length;
+  const inProgress = complaints.filter((complaint) => complaint.status === "In Progress").length;
+  const resolved = complaints.filter((complaint) => complaint.status === "Resolved").length;
 
   if (totalElement) totalElement.textContent = total;
   if (inProgressElement) inProgressElement.textContent = inProgress;
   if (resolvedElement) resolvedElement.textContent = resolved;
 }
 
-function createAccount(event) {
-  event.preventDefault();
-
-  const name = document.getElementById("fullName").value.trim();
-  const email = document.getElementById("registerEmail").value.trim();
-  const role = document.getElementById("registerRole").value;
-  const password = document.getElementById("registerPassword").value.trim();
-  const confirmPassword = document.getElementById("confirmPassword").value.trim();
-
-  const nameError = document.getElementById("nameError");
-  const emailError = document.getElementById("registerEmailError");
-  const roleError = document.getElementById("roleError");
-  const passwordError = document.getElementById("registerPasswordError");
-  const confirmPasswordError = document.getElementById("confirmPasswordError");
-
-  nameError.textContent = "";
-  emailError.textContent = "";
-  roleError.textContent = "";
-  passwordError.textContent = "";
-  confirmPasswordError.textContent = "";
-
-  let isValid = true;
-
-  if (name === "") {
-    nameError.textContent = "Full name is required.";
-    isValid = false;
-  }
-
-  if (email === "") {
-    emailError.textContent = "University email is required.";
-    isValid = false;
-  } else if (!email.includes("@")) {
-    emailError.textContent = "Please enter a valid university email.";
-    isValid = false;
-  }
-
-  if (role === "") {
-    roleError.textContent = "Please select your role.";
-    isValid = false;
-  }
-
-  if (role === "staff" || role === "admin") {
-    roleError.textContent = "Staff and Admin accounts are already created by the system.";
-    isValid = false;
-  }
-
-  if (password === "") {
-    passwordError.textContent = "Password is required.";
-    isValid = false;
-  } else if (password.length < 6) {
-    passwordError.textContent = "Password must be at least 6 characters.";
-    isValid = false;
-  }
-
-  if (confirmPassword === "") {
-    confirmPasswordError.textContent = "Please confirm your password.";
-    isValid = false;
-  } else if (password !== confirmPassword) {
-    confirmPasswordError.textContent = "Passwords do not match.";
-    isValid = false;
-  }
-
-  if (!isValid) return;
-
-  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
-
-  const emailExists = users.some(function (user) {
-    return user.email === email;
-  });
-
-  if (emailExists) {
-    emailError.textContent = "An account with this email already exists.";
-    return;
-  }
-
-  const newUser = {
-    id: Date.now(),
-    name: name,
-    email: email,
-    password: password,
-    role: role
-  };
-
-  users.push(newUser);
-  localStorage.setItem("wethaqUsers", JSON.stringify(users));
-
-  const accountModal = document.getElementById("accountModal");
-  if (accountModal) accountModal.classList.remove("hidden");
-}
-
-/* ===== Department Staff Dashboard ===== */
-
-function loadStaffComplaints() {
+async function loadStaffDashboard() {
   const staffList = document.getElementById("staffComplaintsList");
-
   if (!staffList) return;
 
-  const allComplaints = JSON.parse(localStorage.getItem("complaints")) || [];
-  const staffEmail = localStorage.getItem("wethaqUserEmail");
-  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
+  const user = requireLogin();
+  if (!user) return;
 
-  const currentStaff = users.find(function (user) {
-    return user.email === staffEmail;
-  });
-
-  const staffCollege = currentStaff ? currentStaff.college : "";
-
-  const complaints = allComplaints.filter(function (complaint) {
-    return complaint.college === staffCollege;
-  });
-
-  updateStaffOverview(complaints);
-
-  if (complaints.length === 0) {
-    staffList.innerHTML = `
-      <div class="empty-history">
-        <h3>No complaints assigned yet</h3>
-        <p>Complaints submitted for your college will appear here.</p>
-      </div>
-    `;
+  if (user.role !== "staff") {
+    staffList.innerHTML = `<div class="empty-history"><h3>Access denied</h3><p>This page is only for department staff.</p></div>`;
     return;
   }
 
-  staffList.innerHTML = "";
+  try {
+    const complaints = await getVisibleComplaints();
 
-  complaints.slice().reverse().forEach(function (complaint) {
-    const originalIndex = allComplaints.findIndex(function (item) {
-      return item.id === complaint.id;
-    });
+    showText("staffTotalComplaints", complaints.length);
+    showText("staffUnderReview", complaints.filter((c) => c.status === "Under Review").length);
+    showText("staffInProgress", complaints.filter((c) => c.status === "In Progress").length);
+    showText("staffResolved", complaints.filter((c) => c.status === "Resolved").length);
 
-    const responseText = complaint.response || "";
+    if (complaints.length === 0) {
+      staffList.innerHTML = `<div class="empty-history"><h3>No assigned complaints found</h3></div>`;
+      return;
+    }
 
-    const card = document.createElement("div");
-    card.className = "staff-complaint-card";
+    staffList.innerHTML = "";
 
-    card.innerHTML = `
-      <div class="staff-card-header">
-        <div>
-          <h3>${complaint.title}</h3>
-          <p class="complaint-date">Submitted on ${complaint.date}</p>
+    complaints.slice().reverse().forEach(function (complaint) {
+      const card = document.createElement("div");
+      card.className = "complaint-card staff-complaint-card";
+
+      card.innerHTML = `
+        <div class="complaint-card-header">
+          <div>
+            <h3>${complaint.title}</h3>
+            <p class="complaint-date">Submitted by ${complaint.userEmail} on ${complaint.date}</p>
+          </div>
+          <span class="status-badge ${getStatusClass(complaint.status)}">${complaint.status}</span>
         </div>
 
-        <span class="status-badge ${getStatusClass(complaint.status)}">
-          ${complaint.status}
-        </span>
-      </div>
-
-      <div class="complaint-meta">
-        <div class="meta-item">
-          <span>Category</span>
-          <strong>${complaint.category}</strong>
+        <div class="complaint-meta">
+          <div class="meta-item"><span>Category</span><strong>${complaint.category}</strong></div>
+          <div class="meta-item"><span>Urgency</span><strong>${complaint.urgency}</strong></div>
+          <div class="meta-item"><span>Department</span><strong>${complaint.department}</strong></div>
         </div>
 
-        <div class="meta-item">
-          <span>Urgency</span>
-          <strong>${complaint.urgency}</strong>
-        </div>
+        <p class="complaint-description">${complaint.description}</p>
 
-        <div class="meta-item">
-          <span>College</span>
-          <strong>${complaint.college || "Not selected"}</strong>
-        </div>
-      </div>
-
-      <p class="complaint-description">
-        ${complaint.description}
-      </p>
-
-      <div class="staff-update-box">
-        <div class="input-group">
+        <div class="staff-update-box">
           <label>Status</label>
           <select id="status-${complaint.id}">
             <option value="Under Review" ${complaint.status === "Under Review" ? "selected" : ""}>Under Review</option>
             <option value="In Progress" ${complaint.status === "In Progress" ? "selected" : ""}>In Progress</option>
             <option value="Resolved" ${complaint.status === "Resolved" ? "selected" : ""}>Resolved</option>
           </select>
-        </div>
 
-        <div class="input-group">
           <label>Department Response</label>
-          <textarea id="response-${complaint.id}" placeholder="Write department response here...">${responseText}</textarea>
+          <textarea id="response-${complaint.id}" placeholder="Write response here...">${complaint.response || ""}</textarea>
+
+          <button class="primary-btn" onclick="updateComplaintByStaff(${complaint.id})">Save Update</button>
         </div>
+      `;
 
-        <button class="primary-btn" onclick="saveStaffUpdate(${originalIndex}, ${complaint.id})">
-          Save Update
-        </button>
-      </div>
-    `;
-
-    staffList.appendChild(card);
-  });
-}
-
-function updateStaffOverview(complaints) {
-  const totalElement = document.getElementById("staffTotalComplaints");
-  const underReviewElement = document.getElementById("staffUnderReview");
-  const inProgressElement = document.getElementById("staffInProgress");
-  const resolvedElement = document.getElementById("staffResolved");
-
-  const total = complaints.length;
-
-  const underReview = complaints.filter(function (complaint) {
-    return complaint.status === "Under Review";
-  }).length;
-
-  const inProgress = complaints.filter(function (complaint) {
-    return complaint.status === "In Progress";
-  }).length;
-
-  const resolved = complaints.filter(function (complaint) {
-    return complaint.status === "Resolved";
-  }).length;
-
-  if (totalElement) totalElement.textContent = total;
-  if (underReviewElement) underReviewElement.textContent = underReview;
-  if (inProgressElement) inProgressElement.textContent = inProgress;
-  if (resolvedElement) resolvedElement.textContent = resolved;
-}
-
-function saveStaffUpdate(index, complaintId) {
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
-
-  const statusInput = document.getElementById("status-" + complaintId);
-  const responseInput = document.getElementById("response-" + complaintId);
-
-  if (!statusInput || !responseInput) return;
-
-  complaints[index].status = statusInput.value;
-  complaints[index].response = responseInput.value.trim();
-
-  localStorage.setItem("complaints", JSON.stringify(complaints));
-
-  alert("Complaint update saved successfully.");
-
-  loadStaffComplaints();
-}
-
-/* ===== Admin Dashboard ===== */
-
-function loadAdminDashboard() {
-  const adminTableBody = document.getElementById("adminComplaintsTable");
-  const categoryFilter = document.getElementById("adminCategoryFilter");
-  const departmentFilter = document.getElementById("adminDepartmentFilter");
-
-  if (!adminTableBody) return;
-
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
-
-  updateAdminOverview(complaints);
-  updateAdminCategoryStats(complaints);
-  updateAdminDepartmentStats(complaints);
-  fillAdminFilters(complaints);
-
-  const selectedCategory = categoryFilter ? categoryFilter.value : "All";
-  const selectedCollege = departmentFilter ? departmentFilter.value : "All";
-
-  const filteredComplaints = complaints.filter(function (complaint) {
-    const categoryMatch =
-      selectedCategory === "All" || complaint.category === selectedCategory;
-
-    const collegeMatch =
-      selectedCollege === "All" || complaint.college === selectedCollege;
-
-    return categoryMatch && collegeMatch;
-  });
-
-  if (filteredComplaints.length === 0) {
-    adminTableBody.innerHTML = `
-      <tr>
-        <td colspan="6">No complaints found.</td>
-      </tr>
-    `;
-    return;
+      staffList.appendChild(card);
+    });
+  } catch (error) {
+    staffList.innerHTML = `<div class="empty-history"><h3>${error.message}</h3></div>`;
   }
-
-  adminTableBody.innerHTML = "";
-
-  filteredComplaints.slice().reverse().forEach(function (complaint) {
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-      <td>${complaint.title}</td>
-      <td>${complaint.category}</td>
-      <td>${complaint.college || "Not selected"}</td>
-      <td>${complaint.urgency}</td>
-      <td>
-        <span class="status-badge ${getStatusClass(complaint.status)}">
-          ${complaint.status}
-        </span>
-      </td>
-      <td>${complaint.date}</td>
-    `;
-
-    adminTableBody.appendChild(row);
-  });
 }
 
-function updateAdminOverview(complaints) {
-  const totalElement = document.getElementById("adminTotalComplaints");
-  const underReviewElement = document.getElementById("adminUnderReview");
-  const inProgressElement = document.getElementById("adminInProgress");
-  const resolvedElement = document.getElementById("adminResolved");
-  const urgentElement = document.getElementById("adminUrgent");
+async function updateComplaintByStaff(id) {
+  const status = document.getElementById(`status-${id}`).value;
+  const response = document.getElementById(`response-${id}`).value;
 
-  const total = complaints.length;
-
-  const underReview = complaints.filter(function (complaint) {
-    return complaint.status === "Under Review";
-  }).length;
-
-  const inProgress = complaints.filter(function (complaint) {
-    return complaint.status === "In Progress";
-  }).length;
-
-  const resolved = complaints.filter(function (complaint) {
-    return complaint.status === "Resolved";
-  }).length;
-
-  const urgent = complaints.filter(function (complaint) {
-    return complaint.urgency === "Urgent" || complaint.urgency === "Very Urgent";
-  }).length;
-
-  if (totalElement) totalElement.textContent = total;
-  if (underReviewElement) underReviewElement.textContent = underReview;
-  if (inProgressElement) inProgressElement.textContent = inProgress;
-  if (resolvedElement) resolvedElement.textContent = resolved;
-  if (urgentElement) urgentElement.textContent = urgent;
-}
-
-function countByField(complaints, fieldName) {
-  const counts = {};
-
-  complaints.forEach(function (complaint) {
-    const value = complaint[fieldName] || "Unknown";
-    counts[value] = (counts[value] || 0) + 1;
-  });
-
-  return counts;
-}
-
-function updateAdminCategoryStats(complaints) {
-  const categoryList = document.getElementById("adminCategoryStats");
-
-  if (!categoryList) return;
-
-  const categories = [
-    "Academic",
-    "Facilities",
-    "Financial",
-    "Technical",
-    "Administrative",
-    "Default Category"
-  ];
-
-  const counts = countByField(complaints, "category");
-
-  categoryList.innerHTML = "";
-
-  categories.forEach(function (category) {
-    const item = document.createElement("div");
-    item.className = "admin-stat-row";
-
-    item.innerHTML = `
-      <span>${category}</span>
-      <strong>${counts[category] || 0}</strong>
-    `;
-
-    categoryList.appendChild(item);
-  });
-}
-
-function updateAdminDepartmentStats(complaints) {
-  const departmentList = document.getElementById("adminDepartmentStats");
-
-  if (!departmentList) return;
-
-  const counts = countByField(complaints, "college");
-  const colleges = Object.keys(counts);
-
-  departmentList.innerHTML = "";
-
-  if (colleges.length === 0) {
-    departmentList.innerHTML = `
-      <div class="admin-stat-row">
-        <span>No colleges yet</span>
-        <strong>0</strong>
-      </div>
-    `;
-    return;
-  }
-
-  colleges.forEach(function (college) {
-    const item = document.createElement("div");
-
-    item.className = "admin-stat-row";
-
-    item.innerHTML = `
-      <span>${college}</span>
-      <strong>${counts[college]}</strong>
-    `;
-
-    departmentList.appendChild(item);
-  });
-}
-
-function fillAdminFilters(complaints) {
-  const categoryFilter = document.getElementById("adminCategoryFilter");
-  const departmentFilter = document.getElementById("adminDepartmentFilter");
-
-  if (!categoryFilter || !departmentFilter) return;
-
-  const currentCategory = categoryFilter.value || "All";
-  const currentCollege = departmentFilter.value || "All";
-
-  const categories = [
-    ...new Set(
-      complaints.map(function (complaint) {
-        return complaint.category;
-      })
-    )
-  ];
-
-  const colleges = [
-    ...new Set(
-      complaints.map(function (complaint) {
-        return complaint.college;
-      })
-    )
-  ].filter(Boolean);
-
-  categoryFilter.innerHTML = `<option value="All">All Categories</option>`;
-  departmentFilter.innerHTML = `<option value="All">All Colleges</option>`;
-
-  categories.forEach(function (category) {
-    categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
-  });
-
-  colleges.forEach(function (college) {
-    departmentFilter.innerHTML += `<option value="${college}">${college}</option>`;
-  });
-
-  categoryFilter.value = currentCategory;
-  departmentFilter.value = currentCollege;
-}
-
-/* ===== Default System Accounts ===== */
-
-function initializeDefaultAccounts() {
-  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
-
-  const defaultAccounts = [
-    {
-      id: 1,
-      name: "Admin",
-      email: "admin@ksu.edu.sa",
-      password: "123456",
-      role: "admin"
-    },
-
-    {
-      id: 2,
-      name: "Bariah",
-      email: "bariah@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Computer and Information Sciences"
-    },
-
-    {
-      id: 3,
-      name: "Daniyah",
-      email: "daniyah@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Engineering"
-    },
-
-    {
-      id: 4,
-      name: "Layan",
-      email: "layan@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Science"
-    },
-
-    {
-      id: 5,
-      name: "Afnan",
-      email: "afnan@ksu.edu.sa",
-      password: "123456",
-      role: "staff",
-      college: "College of Nursing"
-    }
-  ];
-
-  defaultAccounts.forEach(function (account) {
-    const existingUser = users.find(function (user) {
-      return user.email === account.email;
+  try {
+    await apiRequest(`/api/complaints/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ status, response })
     });
 
-    if (existingUser) {
-      existingUser.name = account.name;
-      existingUser.password = account.password;
-      existingUser.role = account.role;
-      existingUser.college = account.college;
-    } else {
-      users.push(account);
-    }
-  });
-
-  localStorage.setItem("wethaqUsers", JSON.stringify(users));
+    alert("Complaint updated successfully.");
+    loadStaffDashboard();
+  } catch (error) {
+    alert(error.message);
+  }
 }
 
-/* ===== Page Loader ===== */
+function renderStats(containerId, stats) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const entries = Object.entries(stats || {});
+
+  if (entries.length === 0) {
+    container.innerHTML = `<p class="section-subtitle">No data available.</p>`;
+    return;
+  }
+
+  container.innerHTML = entries
+    .map(([name, count]) => `
+      <div class="status-row">
+        <span>${name}</span>
+        <strong>${count}</strong>
+      </div>
+    `)
+    .join("");
+}
+
+function fillFilter(selectId, values, label) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  const currentValue = select.value || "All";
+  select.innerHTML = `<option value="All">${label}</option>`;
+
+  values.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+
+  select.value = values.includes(currentValue) ? currentValue : "All";
+}
+
+async function loadAdminDashboard() {
+  const tableBody = document.getElementById("adminComplaintsTable");
+  if (!tableBody) return;
+
+  const user = requireLogin();
+  if (!user) return;
+
+  if (user.role !== "admin") {
+    tableBody.innerHTML = `<tr><td colspan="6">Access denied.</td></tr>`;
+    return;
+  }
+
+  try {
+    const complaints = await apiRequest("/api/complaints?role=admin");
+    const report = await apiRequest("/api/reports");
+
+    showText("adminTotalComplaints", complaints.length);
+    showText("adminUnderReview", complaints.filter((c) => c.status === "Under Review").length);
+    showText("adminInProgress", complaints.filter((c) => c.status === "In Progress").length);
+    showText("adminResolved", complaints.filter((c) => c.status === "Resolved").length);
+    showText("adminUrgent", complaints.filter((c) => c.urgency === "Urgent" || c.urgency === "Very Urgent").length);
+
+    renderStats("adminCategoryStats", report.byCategory);
+    renderStats("adminDepartmentStats", report.byDepartment);
+
+    const categories = [...new Set(complaints.map((c) => c.category))];
+    const departments = [...new Set(complaints.map((c) => c.department))];
+
+    fillFilter("adminCategoryFilter", categories, "All Categories");
+    fillFilter("adminDepartmentFilter", departments, "All Colleges");
+
+    const selectedCategory = document.getElementById("adminCategoryFilter")?.value || "All";
+    const selectedDepartment = document.getElementById("adminDepartmentFilter")?.value || "All";
+
+    const filtered = complaints.filter((complaint) => {
+      const categoryMatch = selectedCategory === "All" || complaint.category === selectedCategory;
+      const departmentMatch = selectedDepartment === "All" || complaint.department === selectedDepartment;
+      return categoryMatch && departmentMatch;
+    });
+
+    if (filtered.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="6">No complaints found.</td></tr>`;
+      return;
+    }
+
+    tableBody.innerHTML = filtered
+      .slice()
+      .reverse()
+      .map((complaint) => `
+        <tr>
+          <td>${complaint.title}</td>
+          <td>${complaint.category}</td>
+          <td>${complaint.department}</td>
+          <td>${complaint.urgency}</td>
+          <td>${complaint.status}</td>
+          <td>${complaint.date}</td>
+        </tr>
+      `)
+      .join("");
+  } catch (error) {
+    tableBody.innerHTML = `<tr><td colspan="6">${error.message}</td></tr>`;
+  }
+}
 
 window.addEventListener("DOMContentLoaded", function () {
-  initializeDefaultAccounts();
+  const user = requireLogin();
 
   const userEmailText = document.getElementById("userEmailText");
   const welcomeName = document.getElementById("welcomeName");
   const navUserName = document.getElementById("navUserName");
 
-  const savedEmail = localStorage.getItem("wethaqUserEmail");
-  const savedName = localStorage.getItem("wethaqUserName");
-
-  if (userEmailText && savedEmail) {
-    userEmailText.textContent = savedEmail;
-  }
-
-  if (welcomeName && savedName) {
-    welcomeName.textContent = "Welcome back, " + savedName;
-  }
-
-  if (navUserName && savedName) {
-    navUserName.textContent = savedName;
-  }
+  if (userEmailText && user) userEmailText.textContent = user.email;
+  if (welcomeName && user) welcomeName.textContent = "Welcome back, " + user.name;
+  if (navUserName && user) navUserName.textContent = user.name;
 
   loadDashboardOverview();
   loadComplaintHistory();
-  loadStaffComplaints();
+  loadStaffDashboard();
   loadAdminDashboard();
 });

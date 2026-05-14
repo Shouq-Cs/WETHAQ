@@ -1,0 +1,43 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Department Staff",
+      "email": "staff@ksu.edu.sa",
+      "password": "123456",
+      "role": "staff",
+      "department": "Facilities Department"
+    },
+    {
+      "id": 2,
+      "name": "University Administrator",
+      "email": "admin@ksu.edu.sa",
+      "password": "123456",
+      "role": "admin",
+      "department": "Administration"
+    }
+  ],
+  "complaints": [],
+  "authorizedUsers": [
+    {
+      "email": "staff@ksu.edu.sa",
+      "role": "staff",
+      "name": "Department Staff",
+      "department": "Facilities Department"
+    },
+    {
+      "email": "admin@ksu.edu.sa",
+      "role": "admin",
+      "name": "University Administrator",
+      "department": "Administration"
+    }
+  ],
+  "logs": [
+    {
+      "id": 1778744155812,
+      "action": "LOGIN",
+      "details": "staff@ksu.edu.sa logged in",
+      "date": "2026-05-14T07:35:55.344Z"
+    }
+  ]
+}
