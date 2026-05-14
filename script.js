@@ -45,7 +45,7 @@ function login(event) {
   localStorage.setItem("wethaqUserName", matchedUser.name);
   localStorage.setItem("wethaqUserRole", matchedUser.role);
 
-  if (matchedUser.role === "student") {
+  if (matchedUser.role === "student" || matchedUser.role === "faculty") {
     window.location.href = "dashboard.html";
   } else if (matchedUser.role === "staff") {
     window.location.href = "staff.html";
@@ -112,7 +112,7 @@ function loadDashboardOverview() {
   if (resolvedElement) resolvedElement.textContent = resolved;
 }
 
-async function rewriteComplaint() {
+function rewriteComplaint() {
   const description = document.getElementById("complaintDescription");
   const aiSuggestionBox = document.getElementById("aiSuggestionBox");
 
@@ -125,22 +125,13 @@ async function rewriteComplaint() {
     return;
   }
 
+  const rewrittenText =
+    "I would like to formally report the following issue: " +
+    text +
+    " I kindly request that the responsible department reviews this complaint and takes the necessary action as soon as possible.";
+
   aiSuggestionBox.classList.remove("empty-state");
-  aiSuggestionBox.textContent = "Generating AI rewrite... Please wait.";
-
-  const prompt = `
-  Rewrite the following complaint in a formal, clear, and professional tone.
-  Return ONLY a JSON object with a single key "rewrittenText".
-  Complaint: "${text}"
-  `;
-
-  const aiData = await fetchGroqAI(prompt);
-
-  if (aiData && aiData.rewrittenText) {
-    aiSuggestionBox.textContent = aiData.rewrittenText;
-  } else {
-    aiSuggestionBox.textContent = "Error generating text. Please try again.";
-  }
+  aiSuggestionBox.textContent = rewrittenText;
 }
 
 function useRewrittenText() {
@@ -160,50 +151,126 @@ function useRewrittenText() {
   description.value = aiSuggestionBox.textContent.trim();
 }
 
-async function classifyComplaintWithAI(description) {
-  const prompt = `
-  Analyze the following university complaint.
-  Return ONLY a JSON object with these exact keys:
-  1. "category" (String: e.g., Facilities, Academic, Financial, Technical, Administrative)
-  2. "department" (String: e.g., Facilities Department, Academic Affairs Department, IT Department)
-  3. "urgency" (String: Non-Urgent, Urgent, Very Urgent)
-  4. "manualReviewRequired" (Boolean: true or false)
-  5. "suggestions" (Array of Strings: 2 to 3 suggestions to resolve the issue)
+function classifyComplaint(description) {
+  const text = description.toLowerCase();
 
-  Complaint: "${description}"
-  `;
+  let category = "Default Category";
+  let department = "Manual Review";
+  let manualReviewRequired = true;
 
-  const aiData = await fetchGroqAI(prompt);
-
-  if (!aiData) {
-    return {
-      category: "Unclassified",
-      department: "General Admin",
-      urgency: "Normal",
-      manualReviewRequired: true,
-      suggestions: ["Manual review needed due to AI error."]
-    };
+  if (
+    text.includes("ac") ||
+    text.includes("air conditioner") ||
+    text.includes("elevator") ||
+    text.includes("building") ||
+    text.includes("classroom") ||
+    text.includes("lab")
+  ) {
+    category = "Facilities";
+    department = "Facilities Department";
+    manualReviewRequired = false;
+  } else if (
+    text.includes("grade") ||
+    text.includes("course") ||
+    text.includes("professor") ||
+    text.includes("exam") ||
+    text.includes("assignment")
+  ) {
+    category = "Academic";
+    department = "Academic Affairs Department";
+    manualReviewRequired = false;
+  } else if (
+    text.includes("payment") ||
+    text.includes("tuition") ||
+    text.includes("refund") ||
+    text.includes("fee")
+  ) {
+    category = "Financial";
+    department = "Finance Department";
+    manualReviewRequired = false;
+  } else if (
+    text.includes("login") ||
+    text.includes("wifi") ||
+    text.includes("wi-fi") ||
+    text.includes("system") ||
+    text.includes("portal")
+  ) {
+    category = "Technical";
+    department = "IT Department";
+    manualReviewRequired = false;
+  } else if (
+    text.includes("registration") ||
+    text.includes("schedule") ||
+    text.includes("certificate")
+  ) {
+    category = "Administrative";
+    department = "Administration Department";
+    manualReviewRequired = false;
   }
 
-  return aiData;
+  let urgency = "Non-Urgent";
+
+  if (
+    text.includes("dangerous") ||
+    text.includes("fire") ||
+    text.includes("emergency") ||
+    text.includes("electrical") ||
+    text.includes("safety")
+  ) {
+    urgency = "Very Urgent";
+  } else if (
+    text.includes("urgent") ||
+    text.includes("unsafe") ||
+    text.includes("immediately")
+  ) {
+    urgency = "Urgent";
+  }
+
+  let suggestions = [];
+
+  if (manualReviewRequired) {
+    suggestions = ["No suggestions available"];
+  } else {
+    suggestions = [
+      "Attach a supporting document or image if available.",
+      "Provide the exact location, course, or related details.",
+      "Track the complaint status from Complaint History."
+    ];
+  }
+
+  return {
+    category,
+    department,
+    urgency,
+    manualReviewRequired,
+    suggestions
+  };
 }
 
-async function submitComplaint(event) {
+function submitComplaint(event) {
   event.preventDefault();
 
   const title = document.getElementById("complaintTitle").value.trim();
+  const college = document.getElementById("college").value;
   const description = document.getElementById("complaintDescription").value.trim();
 
   const titleError = document.getElementById("titleError");
+  const collegeError = document.getElementById("collegeError");
   const descriptionError = document.getElementById("descriptionError");
 
   titleError.textContent = "";
+  collegeError.textContent = "";
   descriptionError.textContent = "";
 
   let isValid = true;
 
   if (title === "") {
     titleError.textContent = "Complaint title is required.";
+    isValid = false;
+  }
+
+  if (college === "") {
+    collegeError.textContent = "College is required.";
     isValid = false;
   }
 
@@ -214,14 +281,19 @@ async function submitComplaint(event) {
 
   if (!isValid) return;
 
-const aiResult = await classifyComplaintWithAI(description);
+  const aiResult = classifyComplaint(description);
+
   const complaint = {
     id: Date.now(),
     title: title,
     description: description,
+
+    college: college,
+
     category: aiResult.category,
     urgency: aiResult.urgency,
     department: aiResult.department,
+
     status: "Under Review",
     response: "",
     manualReviewRequired: aiResult.manualReviewRequired,
@@ -245,7 +317,7 @@ const aiResult = await classifyComplaintWithAI(description);
 
   if (resultCategory) resultCategory.textContent = complaint.category;
   if (resultUrgency) resultUrgency.textContent = complaint.urgency;
-  if (resultDepartment) resultDepartment.textContent = complaint.department;
+  if (resultDepartment) resultDepartment.textContent = complaint.college;
   if (resultStatus) resultStatus.textContent = complaint.status;
 
   if (suggestionsList) {
@@ -271,6 +343,7 @@ const aiResult = await classifyComplaintWithAI(description);
   }
 
   document.getElementById("complaintTitle").value = "";
+  document.getElementById("college").value = "";
   document.getElementById("complaintDescription").value = "";
 }
 
@@ -349,8 +422,8 @@ function loadComplaintHistory() {
         </div>
 
         <div class="meta-item">
-          <span>Department</span>
-          <strong>${complaint.department}</strong>
+          <span>College</span>
+          <strong>${complaint.college || "Not selected"}</strong>
         </div>
       </div>
 
@@ -429,6 +502,11 @@ function createAccount(event) {
     isValid = false;
   }
 
+  if (role === "staff" || role === "admin") {
+    roleError.textContent = "Staff and Admin accounts are already created by the system.";
+    isValid = false;
+  }
+
   if (password === "") {
     passwordError.textContent = "Password is required.";
     isValid = false;
@@ -480,7 +558,19 @@ function loadStaffComplaints() {
 
   if (!staffList) return;
 
-  const complaints = JSON.parse(localStorage.getItem("complaints")) || [];
+  const allComplaints = JSON.parse(localStorage.getItem("complaints")) || [];
+  const staffEmail = localStorage.getItem("wethaqUserEmail");
+  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
+
+  const currentStaff = users.find(function (user) {
+    return user.email === staffEmail;
+  });
+
+  const staffCollege = currentStaff ? currentStaff.college : "";
+
+  const complaints = allComplaints.filter(function (complaint) {
+    return complaint.college === staffCollege;
+  });
 
   updateStaffOverview(complaints);
 
@@ -488,7 +578,7 @@ function loadStaffComplaints() {
     staffList.innerHTML = `
       <div class="empty-history">
         <h3>No complaints assigned yet</h3>
-        <p>Complaints submitted by students or faculty members will appear here.</p>
+        <p>Complaints submitted for your college will appear here.</p>
       </div>
     `;
     return;
@@ -497,7 +587,7 @@ function loadStaffComplaints() {
   staffList.innerHTML = "";
 
   complaints.slice().reverse().forEach(function (complaint) {
-    const originalIndex = complaints.findIndex(function (item) {
+    const originalIndex = allComplaints.findIndex(function (item) {
       return item.id === complaint.id;
     });
 
@@ -530,8 +620,8 @@ function loadStaffComplaints() {
         </div>
 
         <div class="meta-item">
-          <span>Department</span>
-          <strong>${complaint.department}</strong>
+          <span>College</span>
+          <strong>${complaint.college || "Not selected"}</strong>
         </div>
       </div>
 
@@ -625,16 +715,16 @@ function loadAdminDashboard() {
   fillAdminFilters(complaints);
 
   const selectedCategory = categoryFilter ? categoryFilter.value : "All";
-  const selectedDepartment = departmentFilter ? departmentFilter.value : "All";
+  const selectedCollege = departmentFilter ? departmentFilter.value : "All";
 
   const filteredComplaints = complaints.filter(function (complaint) {
     const categoryMatch =
       selectedCategory === "All" || complaint.category === selectedCategory;
 
-    const departmentMatch =
-      selectedDepartment === "All" || complaint.department === selectedDepartment;
+    const collegeMatch =
+      selectedCollege === "All" || complaint.college === selectedCollege;
 
-    return categoryMatch && departmentMatch;
+    return categoryMatch && collegeMatch;
   });
 
   if (filteredComplaints.length === 0) {
@@ -654,7 +744,7 @@ function loadAdminDashboard() {
     row.innerHTML = `
       <td>${complaint.title}</td>
       <td>${complaint.category}</td>
-      <td>${complaint.department}</td>
+      <td>${complaint.college || "Not selected"}</td>
       <td>${complaint.urgency}</td>
       <td>
         <span class="status-badge ${getStatusClass(complaint.status)}">
@@ -747,28 +837,29 @@ function updateAdminDepartmentStats(complaints) {
 
   if (!departmentList) return;
 
-  const counts = countByField(complaints, "department");
-  const departments = Object.keys(counts);
+  const counts = countByField(complaints, "college");
+  const colleges = Object.keys(counts);
 
   departmentList.innerHTML = "";
 
-  if (departments.length === 0) {
+  if (colleges.length === 0) {
     departmentList.innerHTML = `
       <div class="admin-stat-row">
-        <span>No departments yet</span>
+        <span>No colleges yet</span>
         <strong>0</strong>
       </div>
     `;
     return;
   }
 
-  departments.forEach(function (department) {
+  colleges.forEach(function (college) {
     const item = document.createElement("div");
+
     item.className = "admin-stat-row";
 
     item.innerHTML = `
-      <span>${department}</span>
-      <strong>${counts[department]}</strong>
+      <span>${college}</span>
+      <strong>${counts[college]}</strong>
     `;
 
     departmentList.appendChild(item);
@@ -782,7 +873,7 @@ function fillAdminFilters(complaints) {
   if (!categoryFilter || !departmentFilter) return;
 
   const currentCategory = categoryFilter.value || "All";
-  const currentDepartment = departmentFilter.value || "All";
+  const currentCollege = departmentFilter.value || "All";
 
   const categories = [
     ...new Set(
@@ -792,32 +883,103 @@ function fillAdminFilters(complaints) {
     )
   ];
 
-  const departments = [
+  const colleges = [
     ...new Set(
       complaints.map(function (complaint) {
-        return complaint.department;
+        return complaint.college;
       })
     )
-  ];
+  ].filter(Boolean);
 
   categoryFilter.innerHTML = `<option value="All">All Categories</option>`;
-  departmentFilter.innerHTML = `<option value="All">All Departments</option>`;
+  departmentFilter.innerHTML = `<option value="All">All Colleges</option>`;
 
   categories.forEach(function (category) {
     categoryFilter.innerHTML += `<option value="${category}">${category}</option>`;
   });
 
-  departments.forEach(function (department) {
-    departmentFilter.innerHTML += `<option value="${department}">${department}</option>`;
+  colleges.forEach(function (college) {
+    departmentFilter.innerHTML += `<option value="${college}">${college}</option>`;
   });
 
   categoryFilter.value = currentCategory;
-  departmentFilter.value = currentDepartment;
+  departmentFilter.value = currentCollege;
+}
+
+/* ===== Default System Accounts ===== */
+
+function initializeDefaultAccounts() {
+  const users = JSON.parse(localStorage.getItem("wethaqUsers")) || [];
+
+  const defaultAccounts = [
+    {
+      id: 1,
+      name: "Admin",
+      email: "admin@ksu.edu.sa",
+      password: "123456",
+      role: "admin"
+    },
+
+    {
+      id: 2,
+      name: "Bariah",
+      email: "bariah@ksu.edu.sa",
+      password: "123456",
+      role: "staff",
+      college: "College of Computer and Information Sciences"
+    },
+
+    {
+      id: 3,
+      name: "Daniyah",
+      email: "daniyah@ksu.edu.sa",
+      password: "123456",
+      role: "staff",
+      college: "College of Engineering"
+    },
+
+    {
+      id: 4,
+      name: "Layan",
+      email: "layan@ksu.edu.sa",
+      password: "123456",
+      role: "staff",
+      college: "College of Science"
+    },
+
+    {
+      id: 5,
+      name: "Afnan",
+      email: "afnan@ksu.edu.sa",
+      password: "123456",
+      role: "staff",
+      college: "College of Nursing"
+    }
+  ];
+
+  defaultAccounts.forEach(function (account) {
+    const existingUser = users.find(function (user) {
+      return user.email === account.email;
+    });
+
+    if (existingUser) {
+      existingUser.name = account.name;
+      existingUser.password = account.password;
+      existingUser.role = account.role;
+      existingUser.college = account.college;
+    } else {
+      users.push(account);
+    }
+  });
+
+  localStorage.setItem("wethaqUsers", JSON.stringify(users));
 }
 
 /* ===== Page Loader ===== */
 
 window.addEventListener("DOMContentLoaded", function () {
+  initializeDefaultAccounts();
+
   const userEmailText = document.getElementById("userEmailText");
   const welcomeName = document.getElementById("welcomeName");
   const navUserName = document.getElementById("navUserName");
@@ -842,55 +1004,3 @@ window.addEventListener("DOMContentLoaded", function () {
   loadStaffComplaints();
   loadAdminDashboard();
 });
-async function fetchGroqAI(prompt) {
-  const apiKey = "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";
-  const url = "https://api.groq.com/openai/v1/chat/completions";
-
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + apiKey,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          { 
-            role: "system", 
-            content: "You are an AI assistant. Always output strictly valid JSON without any markdown formatting or extra text." 
-          },
-          { 
-            role: "user", 
-            content: prompt 
-          }
-        ],
-        temperature: 0.3
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Groq API Rejected the request:", data);
-      return null;
-    }
-
-    const content = data.choices[0].message.content;
-    
-    const startIndex = content.indexOf('{');
-    const endIndex = content.lastIndexOf('}') + 1;
-    
-    if (startIndex !== -1 && endIndex !== -1) {
-      const jsonString = content.substring(startIndex, endIndex);
-      return JSON.parse(jsonString);
-    } else {
-      console.error("AI did not return a valid JSON structure:", content);
-      return null;
-    }
-
-  } catch (error) {
-    console.error("Network or Parsing Error:", error);
-    return null;
-  }
-}
